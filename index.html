@@ -2388,7 +2388,7 @@ function save(silent){
   // Stamp local modification time (used to guard cloudPull)
   if(!silent) localStorage.setItem('bda_local_ts',String(Date.now()));
   // Auto cloud push if configured and not a silent internal save
-  if(!silent && syncCfg.url){
+  if(!silent && (syncCfg.url||syncCfg.webDriveConnected)){
     clearTimeout(save._t);
     save._t=setTimeout(()=>cloudPush(),2500);
   }
@@ -2838,7 +2838,7 @@ function saveRecord(){
 }
 function confDelRec(id){
   document.getElementById('conf-msg').textContent='Este registro se eliminará permanentemente.';
-  confCb=()=>{pushUndo('Eliminar registro');records=records.filter(r=>r.id!==id);save();if(syncCfg.url){clearTimeout(save._t);cloudPush();}renderB();toast('Eliminado','s');};
+  confCb=()=>{pushUndo('Eliminar registro');records=records.filter(r=>r.id!==id);save();if((syncCfg.url||syncCfg.webDriveConnected)){clearTimeout(save._t);cloudPush();}renderB();toast('Eliminado','s');};
   document.getElementById('conf').classList.add('open');
 }
 
@@ -2887,7 +2887,7 @@ function saveAtt(){
   // Persist only attendance and grades (auto-SER may update grades)
   localStorage.setItem(SK.a,JSON.stringify(attendance));
   localStorage.setItem(SK.g,JSON.stringify(grades));
-  if(syncCfg.url){clearTimeout(save._t);save._t=setTimeout(()=>cloudPush(),2500);}
+  if((syncCfg.url||syncCfg.webDriveConnected)){clearTimeout(save._t);save._t=setTimeout(()=>cloudPush(),2500);}
   attDirty=false;toast('Asistencia guardada ✅','s');
 }
 
@@ -3193,7 +3193,7 @@ function removeDate(cId,asig,per,date){
     pushUndo('Quitar fecha '+fmtS(date));
     data.dates=data.dates.filter(d=>d!==date);
     Object.values(data.records).forEach(r=>delete r[date]);
-    save();if(syncCfg.url){clearTimeout(save._t);cloudPush();}renderAtt();toast('Fecha eliminada','s');
+    save();if((syncCfg.url||syncCfg.webDriveConnected)){clearTimeout(save._t);cloudPush();}renderAtt();toast('Fecha eliminada','s');
   };
   document.getElementById('conf').classList.add('open');
 }
@@ -3311,7 +3311,7 @@ function markGrDirty(){
 }
 function saveGrades(){
   localStorage.setItem(SK.g,JSON.stringify(grades));
-  if(syncCfg.url){clearTimeout(save._t);save._t=setTimeout(()=>cloudPush(),2500);}
+  if((syncCfg.url||syncCfg.webDriveConnected)){clearTimeout(save._t);save._t=setTimeout(()=>cloudPush(),2500);}
   grDirty=false;toast('Calificaciones guardadas ✅','s');
 }
 
@@ -4224,7 +4224,7 @@ function confDelAct(cId,asig,per,actId){
     save();
     markGrDirty();
     // Push immediately — don't rely on debounce for destructive ops
-    if(syncCfg.url){ clearTimeout(save._t); cloudPush(); }
+    if((syncCfg.url||syncCfg.webDriveConnected)){ clearTimeout(save._t); cloudPush(); }
     renderGrades();
     toast('Actividad eliminada ✅','s');
   };
@@ -4443,7 +4443,7 @@ function saveCourse(){
 }
 function confDelC(id){
   document.getElementById('conf-msg').textContent='El curso y todos sus datos se eliminarán permanentemente.';
-  confCb=()=>{pushUndo('Eliminar curso');courses=courses.filter(x=>x.id!==id);records=records.filter(r=>r.cursoId!==id);save();if(syncCfg.url){clearTimeout(save._t);cloudPush();}renderSB();renderCfg();_refreshSegCursoSel();toast('Eliminado','s');};
+  confCb=()=>{pushUndo('Eliminar curso');courses=courses.filter(x=>x.id!==id);records=records.filter(r=>r.cursoId!==id);save();if((syncCfg.url||syncCfg.webDriveConnected)){clearTimeout(save._t);cloudPush();}renderSB();renderCfg();_refreshSegCursoSel();toast('Eliminado','s');};
   document.getElementById('conf').classList.add('open');
 }
 // Refreshes only the course names in the seguimiento selector without resetting the selection
@@ -4704,7 +4704,7 @@ function confDelEst(id,cId,per){
     if(students[cId]&&students[cId][per])students[cId][per]=students[cId][per].filter(s=>s.id!==id);
     Object.keys(attendance[cId]||{}).forEach(asig=>Object.keys(attendance[cId][asig]||{}).forEach(p=>{if(attendance[cId][asig][p]?.records)delete attendance[cId][asig][p].records[id];}));
     Object.keys(grades[cId]||{}).forEach(asig=>Object.keys(grades[cId][asig]||{}).forEach(p=>{if(grades[cId][asig][p]?.scores)delete grades[cId][asig][p].scores[id];}));
-    save();if(syncCfg.url){clearTimeout(save._t);cloudPush();}renderEst();toast('Eliminado','s');
+    save();if((syncCfg.url||syncCfg.webDriveConnected)){clearTimeout(save._t);cloudPush();}renderEst();toast('Eliminado','s');
   };
   document.getElementById('conf').classList.add('open');
 }
@@ -4719,7 +4719,7 @@ function doConf(){if(confCb)confCb();closeConf();}
 function renderSyncPanel(){
   const el=document.getElementById('panel-sync');
   if(!el)return;
-  const isConf=!!syncCfg.url;
+  const isConf=!!syncCfg.url||!!syncCfg.webDriveConnected;
   const sCol={idle:'var(--ink3)',syncing:'var(--am)',ok:'var(--gr)',error:'var(--rd)'}[syncStatus];
   const sTxt={idle:'Sin configurar',syncing:'Sincronizando…',ok:'✅ Sincronizado',error:'❌ Error de conexión'}[syncStatus];
   const lastTxt=lastSync?('Última sync: '+new Date(lastSync).toLocaleString('es-CO')):'Nunca sincronizado';
@@ -5255,9 +5255,10 @@ function showOnboarding(){
 }
 
 function showSyncWelcome(){
+  // Si ya está conectado por Drive, no mostrar
+  if(syncCfg.webDriveConnected){init(true);return;}
   const ov=document.getElementById('sync-welcome-ov');
   if(!ov)return;
-  // Pre-fill if URL already saved
   const inp=document.getElementById('sw-url');
   if(inp&&syncCfg.url) inp.value=syncCfg.url;
   ov.style.display='flex';
@@ -5303,7 +5304,7 @@ function exitApp(){
     }
     // Save everything then close
     save(true);
-    if(syncCfg.url) cloudPush();
+    if(syncCfg.url||syncCfg.webDriveConnected) cloudPush();
     setTimeout(()=>{
       window.close();
       toast('Datos guardados. Cierra la pestaña para salir.','s');
@@ -5407,7 +5408,7 @@ function cloudSaveAll(){
     
   }
   save(true);
-  if(!syncCfg.url){
+  if(!syncCfg.url&&!syncCfg.webDriveConnected){
     toast('Datos guardados localmente ✅','s');
     return;
   }
@@ -6036,7 +6037,7 @@ function wNext(){
   else if(wStep===2){const inst=(document.getElementById('w-inst')?.value||'').trim();if(!inst){toast('La institución es obligatoria','e');return;}profile.institucion=inst;profile.ciudad=(document.getElementById('w-ciudad')?.value||'').trim();profile.tel=(document.getElementById('w-tel')?.value||'').trim();}
   else{if(!wCourses.length){toast('Agrega al menos un curso','e');return;}wCourses.forEach(c=>courses.push({id:uid(),...c}));localStorage.setItem(SK.s,'1');save();document.getElementById('wizard').style.display='none';
     // After wizard: if no sync URL, show sync setup; otherwise go straight to app
-    if(!syncCfg.url){ showSyncWelcome(); } else { init(true); }
+    if(!syncCfg.url&&!syncCfg.webDriveConnected){ showSyncWelcome(); } else { if(syncCfg.webDriveConnected)cloudPull(); init(true); }
     toast('¡Datos guardados! 🎉','s');return;}
   wStep++;renderWStep();
 }
@@ -6275,7 +6276,7 @@ function saveHorarios(){
   collectHorEditor();
   saveScheduleData();
   // Trigger cloud sync
-  if(syncCfg.url){clearTimeout(save._t);save._t=setTimeout(()=>cloudPush(),2500);}
+  if((syncCfg.url||syncCfg.webDriveConnected)){clearTimeout(save._t);save._t=setTimeout(()=>cloudPush(),2500);}
   toast('Horarios guardados ✅','s');
   renderAsigEditor();
 }
@@ -6377,7 +6378,7 @@ function setAsig(di,slotId,field,val){
 
 function saveAsignacion(){
   saveScheduleData();
-  if(syncCfg.url){clearTimeout(save._t);save._t=setTimeout(()=>cloudPush(),2500);}
+  if((syncCfg.url||syncCfg.webDriveConnected)){clearTimeout(save._t);save._t=setTimeout(()=>cloudPush(),2500);}
   toast('Asignación guardada ✅','s');
 }
 
@@ -9503,7 +9504,7 @@ function saveAttComment(cId, asig, per, date){
   }
   // Partial save — comments live in attendance object
   localStorage.setItem(SK.a,JSON.stringify(attendance));
-  if(syncCfg.url){clearTimeout(save._t);save._t=setTimeout(()=>cloudPush(),2500);}
+  if((syncCfg.url||syncCfg.webDriveConnected)){clearTimeout(save._t);save._t=setTimeout(()=>cloudPush(),2500);}
   closeAttPop();
   // Patch column color in-place — no full re-render
   _patchColColor(date, color);
@@ -11523,8 +11524,8 @@ function _initMain(skip){
   } else {
     setView('GENERAL');
   }
-  if(syncCfg.url)cloudPull();
-  else setTimeout(showSyncWelcome, 600);
+  if((syncCfg.url||syncCfg.webDriveConnected))cloudPull();
+  // sync welcome handled by init flow
   if(!localStorage.getItem(SK_HELP))setTimeout(startTour,800);
   if(typeof requestIdleCallback!=='undefined'){
     requestIdleCallback(()=>{fillAttSels();fillGrSels();});
