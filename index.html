@@ -4221,7 +4221,7 @@ function confDelAct(cId,asig,per,actId){
     save();
     markGrDirty();
     // Push immediately — don't rely on debounce for destructive ops
-    if(syncCfg.url){ clearTimeout(save._t); cloudPush(); }
+    if(_isDriveReady()){ clearTimeout(save._t); cloudPush(); }
     renderGrades();
     toast('Actividad eliminada ✅','s');
   };
@@ -4713,71 +4713,6 @@ function doConf(){if(confCb)confCb();closeConf();}
 // ══════════════════════════
 // SYNC PANEL
 // ══════════════════════════
-function renderSyncPanel(){
-  const el=document.getElementById('panel-sync');
-  if(!el)return;
-  const isConf=!!syncCfg.url;
-  const sCol={idle:'var(--ink3)',syncing:'var(--am)',ok:'var(--gr)',error:'var(--rd)'}[syncStatus];
-  const sTxt={idle:'Sin configurar',syncing:'Sincronizando…',ok:'✅ Sincronizado',error:'❌ Error de conexión'}[syncStatus];
-  const lastTxt=lastSync?('Última sync: '+new Date(lastSync).toLocaleString('es-CO')):'Nunca sincronizado';
-
-  let html='';
-
-  // Card 1: Contact info (only if not configured)
-  if(!isConf){
-    html+='<div class="card" style="background:var(--acl);border-color:rgba(45,91,227,.2)">';
-    html+='<div class="card-t" style="color:var(--ac)">☁️ Activar sincronización</div>';
-    html+='<div style="font-size:13px;color:var(--ink2);line-height:1.8;margin-bottom:14px">';
-    html+='La sincronización entre PC y Tablet requiere una URL de conexión personalizada.<br>';
-    html+='Si ya adquirió la licencia completa y aún no tiene su URL, contacte al desarrollador:';
-    html+='</div>';
-    html+='<div style="display:flex;flex-direction:column;gap:8px">';
-    html+='<div style="background:var(--sf);border:1px solid var(--br);border-radius:var(--rs);padding:10px 14px;font-size:13px;display:flex;align-items:center;gap:8px">';
-    html+='<span style="font-size:16px">📧</span>';
-    html+='<div><div style="font-weight:600;color:var(--ink)">Nanjo Projects</div>';
-    html+='<div style="color:var(--ink3);font-size:12px">nanjoprojects@gmail.com</div></div>';
-    html+='</div>';
-    html+='</div>';
-    html+='<div style="font-size:11px;color:var(--ac);margin-top:12px">Si ya tiene la URL, péguela en el campo de abajo y haga clic en <strong>Guardar y conectar</strong>.</div>';
-    html+='</div>';
-  }
-
-  // Card 2: Connection
-  html+='<div class="card">';
-  html+='<div class="card-t">☁️ Conexión con la nube';
-  if(isConf)html+='<span style="font-size:11px;font-weight:500;color:'+sCol+'">'+sTxt+'</span>';
-  html+='</div>';
-  html+='<div class="fg" style="margin-bottom:13px">';
-  html+='<label>URL de sincronización</label>';
-  html+='<input id="sync-url" placeholder="https://script.google.com/macros/s/..." value="'+esc(syncCfg.url||'')+'">';
-  html+='<div style="font-size:11px;color:var(--ink3);margin-top:4px">Pega la misma URL en cada dispositivo que uses.</div>';
-  html+='</div>';
-  html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">';
-  html+='<button class="btn primary" onclick="saveSyncUrl()">💾 Guardar y conectar</button>';
-  if(isConf){
-    html+='<button class="btn" onclick="cloudPull()">⬇ Traer datos de la nube</button>';
-    html+='<button class="btn" onclick="cloudPush()">⬆ Enviar datos a la nube</button>';
-    html+='<button class="btn danger sm" onclick="clearSync()">✕ Desconectar</button>';
-  }
-  html+='</div>';
-  if(isConf)html+='<div style="font-size:12px;color:var(--ink3)">'+lastTxt+'</div>';
-  html+='</div>';
-
-  // Card 3: Tips
-  html+='<div class="card" style="background:var(--aml);border-color:rgba(180,83,9,.2)">';
-  html+='<div style="font-size:13px;color:var(--am);font-weight:600;margin-bottom:9px">📌 Cómo usarlo día a día</div>';
-  html+='<div style="font-size:13px;color:var(--ink2);line-height:1.9">';
-  html+='🖥️ <strong>PC:</strong> los datos se envían automáticamente al guardar.<br>';
-  html+='📱 <strong>Tablet:</strong> antes de trabajar, toca <strong>"⬇ Traer datos"</strong>.<br>';
-  html+='📴 <strong>Sin internet:</strong> todo sigue funcionando. Envía manualmente cuando vuelva la conexión.<br>';
-  html+='❓ <strong>Sin URL:</strong> contacta a <em>Nanjo Projects</em> — nanjoprojects@gmail.com';
-  html+='</div></div>';
-
-  el.innerHTML=html;
-}
-
-
-
 function saveSyncUrl(){
   const url=(document.getElementById('sync-url')?.value||'').trim();
   if(!url){toast('Ingresa la URL','e');return;}
@@ -5231,37 +5166,6 @@ function showOnboarding(){
   ov.style.display='flex';
 }
 
-function showSyncWelcome(){
-  const ov=document.getElementById('sync-welcome-ov');
-  if(!ov)return;
-  // Pre-fill if URL already saved
-  const inp=document.getElementById('sw-url');
-  if(inp&&syncCfg.url) inp.value=syncCfg.url;
-  ov.style.display='flex';
-}
-
-function saveSyncWelcome(){
-  const url=(document.getElementById('sw-url')?.value||'').trim();
-  if(!url){toast('Ingresa la URL primero','e');return;}
-  if(!url.startsWith('https://script.google.com')){toast('La URL debe ser de script.google.com','e');return;}
-  syncCfg.url=url;saveSyncCfg();
-  document.getElementById('sync-welcome-ov').style.display='none';
-  toast('Conectado ✅ — sincronizando…','s');
-  // If setup not yet completed, just pull; otherwise go to app
-  if(!localStorage.getItem(SK.s)){ cloudPull(); }
-  else { cloudPull(); if(!document.querySelector('.page.on')) init(true); }
-}
-
-function skipSyncWelcome(){
-  document.getElementById('sync-welcome-ov').style.display='none';
-  // If wizard just finished, enter the app now
-  if(!document.querySelector('.page.on')) init(true);
-}
-function clearSync(){
-  if(!confirm('¿Desconectar? Los datos locales se conservan.'))return;
-  syncCfg={};saveSyncCfg();syncStatus='idle';renderSyncPanel();toast('Desconectado','s');
-}
-
 // ── Fullscreen ──
 // ── Exit app ──
 function exitApp(){
@@ -5275,12 +5179,13 @@ function exitApp(){
       if(!confirm('¿Salir sin guardar? Los cambios se perderán.'))return;
       if(typeof AndroidApp!=='undefined'){AndroidApp.exitApp();return;}
       window.close();
+      // Fallback for browsers that block window.close()
       toast('Cierra esta pestaña manualmente para salir','s');
       return;
     }
     // Save everything then close
     save(true);
-    if(syncCfg.url) cloudPush();
+    if(_isDriveReady()) cloudPush();
     setTimeout(()=>{
       window.close();
       toast('Datos guardados. Cierra la pestaña para salir.','s');
@@ -5291,6 +5196,7 @@ function exitApp(){
   if(!confirm('¿Salir de Bitácora Docente?'))return;
   if(typeof AndroidApp!=='undefined'){AndroidApp.exitApp();return;}
   window.close();
+  // Fallback
   toast('Cierra esta pestaña para salir','s');
 }
 
@@ -5384,8 +5290,8 @@ function cloudSaveAll(){
     
   }
   save(true);
-  if(!syncCfg.url){
-    toast('Datos guardados localmente ✅','s');
+  if(!_isDriveReady()){
+    toast('Guardado localmente (sin conexion a Drive)','s');
     return;
   }
   const btn=document.getElementById('btn-cloud-save');
@@ -5393,67 +5299,6 @@ function cloudSaveAll(){
   cloudPush().finally(()=>{
     if(btn){btn.textContent='💾 Guardar';btn.disabled=false;}
   });
-}
-
-async function cloudPush(){
-  if(!syncCfg.url){toast('Configura la URL primero','e');return;}
-  syncStatus='syncing';
-  const localTs=Number(localStorage.getItem('bda_local_ts')||0);
-  try{
-    const payload=JSON.stringify({profile,courses,records,students,attendance,grades,perCfg,perTemplate,horarios,horNames,asignacion,seguimiento,syncCfg,voicesCfg,_v:'2026',_d:new Date().toISOString(),_ts:localTs});
-    const resp=await fetch(syncCfg.url,{method:'POST',body:payload,headers:{'Content-Type':'text/plain'}});
-    const data=await resp.json();
-    if(data.ok){
-      syncStatus='ok';lastSync=Date.now();
-      localStorage.setItem('bda_last_push_ts',String(localTs));
-      toast('☁️ Enviado a la nube ✅','s');
-    }
-    else{syncStatus='error';toast('Error: '+(data.error||'desconocido'),'e');}
-  }catch(e){syncStatus='error';toast('Error de conexión. Verifica la URL.','e');}
-  const sp=document.getElementById('panel-sync');if(sp&&sp.style.display!=='none')renderSyncPanel();
-}
-
-async function cloudPull(){
-  if(!syncCfg.url)return;
-  // Guard: if local data is newer than last successful push, warn before overwriting
-  const localTs=Number(localStorage.getItem('bda_local_ts')||0);
-  const lastPushTs=Number(localStorage.getItem('bda_last_push_ts')||0);
-  const hasUnpushedChanges=localTs>lastPushTs&&lastPushTs>0;
-  syncStatus='syncing';
-  try{
-    const resp=await fetch(syncCfg.url+'?t='+Date.now());
-    const data=await resp.json();
-    if(data&&data.courses&&data.courses.length){
-      // If local has unpushed changes AND cloud data is older, skip pull
-      const cloudTs=Number(data._ts||0);
-      if(hasUnpushedChanges&&cloudTs>0&&cloudTs<localTs){
-        syncStatus='ok';
-        toast('⚠️ Datos locales más recientes que la nube — usa ☁️ Guardar para subir','s');
-        return;
-      }
-      profile=data.profile||profile;courses=data.courses||courses;records=data.records||records;
-      students=data.students||students;attendance=data.attendance||attendance;
-      grades=data.grades||grades;perCfg=data.perCfg||perCfg;
-      if(data.horarios)horarios=data.horarios;
-      if(data.horNames)horNames=data.horNames;
-      if(data.perTemplate)perTemplate=data.perTemplate;
-      if(data.asignacion)asignacion=data.asignacion;
-      if(data.seguimiento)seguimiento=data.seguimiento;
-      if(data.syncCfg)syncCfg=data.syncCfg;
-      if(data.voicesCfg)voicesCfg=data.voicesCfg;
-      saveScheduleData();saveSeg();
-      save(true);
-      // After pull, align timestamps so next push is clean
-      if(cloudTs>0) localStorage.setItem('bda_last_push_ts',String(cloudTs));
-      renderTP();renderSB();renderCurrentPage();
-      syncStatus='ok';lastSync=Date.now();
-      toast('☁️ Datos actualizados desde la nube ✅','s');
-    } else {
-      syncStatus='ok';lastSync=Date.now();
-      toast('La nube está vacía — usa "⬆ Enviar" primero','s');
-    }
-  }catch(e){syncStatus='error';toast('No se pudo conectar. Verifica la URL.','e');}
-  const sp=document.getElementById('panel-sync');if(sp&&sp.style.display!=='none')renderSyncPanel();
 }
 
 // ══════════════════════════
@@ -5858,7 +5703,7 @@ function wNext(){
   else if(wStep===2){const inst=(document.getElementById('w-inst')?.value||'').trim();if(!inst){toast('La institución es obligatoria','e');return;}profile.institucion=inst;profile.ciudad=(document.getElementById('w-ciudad')?.value||'').trim();profile.tel=(document.getElementById('w-tel')?.value||'').trim();}
   else{if(!wCourses.length){toast('Agrega al menos un curso','e');return;}wCourses.forEach(c=>courses.push({id:uid(),...c}));localStorage.setItem(SK.s,'1');save();document.getElementById('wizard').style.display='none';
     // After wizard: if no sync URL, show sync setup; otherwise go straight to app
-    if(!_isDriveReady()){ showSyncWelcome(); } else { if(_isDriveReady())cloudPull(); init(true); }
+    if(!_isDriveReady()){ showSyncWelcome(); } else { cloudPull(); init(true); }
     toast('¡Datos guardados! 🎉','s');return;}
   wStep++;renderWStep();
 }
@@ -10439,9 +10284,7 @@ function openActEntry(actId,cId,asig,per,focusStuId){
 }
 
 function closeActEntry(){
-  var pendCmts2=document.querySelectorAll('[id^="ae-new-cmt-"]');var hasPend=false;
-  pendCmts2.forEach(function(inp){if(inp.value.trim())hasPend=true;});
-  if(hasPend){if(!confirm('Hay comentarios sin guardar.\n\nCerrar sin guardar?'))return;}
+  var pc2=document.querySelectorAll('[id^="ae-new-cmt-"]');var hp2=false;pc2.forEach(function(i){if(i.value.trim())hp2=true;});if(hp2){if(!confirm('Hay comentarios sin guardar.\nCerrar sin guardar?'))return;}
   // Verificar si hay cambios sin guardar comparando _aeBuf con datos reales
   if(Object.keys(_aeBuf).length){
     const {cId,asig,per,actId}=_ae;
@@ -10791,11 +10634,8 @@ function saveActEntry(){
     });
   }
   save();
-  var freshData2=getGrD(cId,asig,per);
-  studs.forEach(function(st){
-    var sc2=(freshData2.scores[st.id]||{})[actId]||{};
-    _aeBuf[st.id]={obt:sc2.obt!==undefined&&sc2.obt!==''?String(sc2.obt):'',pos:sc2.pos!==undefined?String(sc2.pos):'',posFixed:!!sc2.posFixed,comments:sc2.comments?JSON.parse(JSON.stringify(sc2.comments)):[]};
-  });
+  var fd2=getGrD(cId,asig,per);
+  studs.forEach(function(st){var sc2=(fd2.scores[st.id]||{})[actId]||{};_aeBuf[st.id]={obt:sc2.obt!==undefined&&sc2.obt!==''?String(sc2.obt):'',pos:sc2.pos!==undefined?String(sc2.pos):'',posFixed:!!sc2.posFixed,comments:sc2.comments?JSON.parse(JSON.stringify(sc2.comments)):[]};});
   markGrDirty();renderGrades();renderAeList();
   toast('Notas guardadas'+(saved<studs.length?' ('+saved+' cambios)':'')+(posGlobalChanged?' - posibles actualizados':''),'s');
 }
@@ -11273,223 +11113,17 @@ function refreshAutoAttSER(cId, asig, per){
   });
 }
 
-// ════════════════════════════════════════
-// SINCRONIZACION GOOGLE DRIVE
-// ════════════════════════════════════════
-var WEB_CLIENT_ID='437794734136-r7oh903t8sigm3gd4fsp0tn9uahsfmh0.apps.googleusercontent.com';
-var DRIVE_FOLDER_NAME='Bitacora Docente';
-var DRIVE_FILE_NAME='bitacora_docente_backup.json';
-var _gAccessToken='',_gTokenExpiry=0,_gFolderId='',_gFileId='';
-
-function _isDriveReady(){
-  return (typeof AndroidDrive!=='undefined'&&!!AndroidDrive.checkSignInStatus())||!!syncCfg.webDriveConnected;
-}
-function webDriveSignIn(){
-  if(typeof google==='undefined'){toast('Recarga la pagina e intenta de nuevo','e');return;}
-  var btn=document.getElementById('sw-drive-btn');var st=document.getElementById('sw-drive-status');
-  if(btn){btn.disabled=true;btn.textContent='Conectando...';}
-  if(st)st.textContent='Esperando autorizacion de Google...';
-  var client=google.accounts.oauth2.initTokenClient({client_id:WEB_CLIENT_ID,scope:'https://www.googleapis.com/auth/drive.file',
-    callback:function(tr){
-      if(tr.error){if(btn){btn.disabled=false;btn.textContent='Conectar con Google';}if(st)st.textContent='';toast('Error al conectar con Google','e');return;}
-      _gAccessToken=tr.access_token;_gTokenExpiry=Date.now()+(tr.expires_in-60)*1000;
-      syncCfg.webDriveConnected=true;saveSyncCfg();
-      var ov=document.getElementById('sync-welcome-ov');if(ov)ov.style.display='none';
-      toast('Conectado con Google Drive','s');_afterDriveConnect();
-    }
-  });client.requestAccessToken();
-}
-function webDriveSignOut(){
-  if(_gAccessToken&&typeof google!=='undefined')google.accounts.oauth2.revoke(_gAccessToken,function(){});
-  _gAccessToken='';_gTokenExpiry=0;_gFolderId='';_gFileId='';
-  syncCfg.webDriveConnected=false;saveSyncCfg();renderSyncPanel&&renderSyncPanel();
-  toast('Sesion de Google cerrada','s');
-}
-function _gEnsureTokenCb(resolve){
-  var client=google.accounts.oauth2.initTokenClient({client_id:WEB_CLIENT_ID,scope:'https://www.googleapis.com/auth/drive.file',prompt:'',
-    callback:function(tr){if(tr.error){resolve(false);return;}_gAccessToken=tr.access_token;_gTokenExpiry=Date.now()+(tr.expires_in-60)*1000;resolve(true);}
-  });client.requestAccessToken();
-}
-async function _gEnsureToken(){if(_gAccessToken&&Date.now()<_gTokenExpiry)return true;return new Promise(_gEnsureTokenCb);}
-async function _gGetFolder(){
-  if(_gFolderId)return _gFolderId;
-  var q=encodeURIComponent("name='"+DRIVE_FOLDER_NAME+"' and mimeType='application/vnd.google-apps.folder' and trashed=false");
-  var r=await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id)',{headers:{Authorization:'Bearer '+_gAccessToken}});
-  var d=await r.json();
-  if(d.files&&d.files.length){_gFolderId=d.files[0].id;return _gFolderId;}
-  var cr=await fetch('https://www.googleapis.com/drive/v3/files',{method:'POST',headers:{Authorization:'Bearer '+_gAccessToken,'Content-Type':'application/json'},body:JSON.stringify({name:DRIVE_FOLDER_NAME,mimeType:'application/vnd.google-apps.folder'})});
-  var cd=await cr.json();_gFolderId=cd.id;return _gFolderId;
-}
-async function _gGetFile(fid){
-  if(_gFileId)return _gFileId;
-  var q=encodeURIComponent("name='"+DRIVE_FILE_NAME+"' and '"+fid+"' in parents and trashed=false");
-  var r=await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id)',{headers:{Authorization:'Bearer '+_gAccessToken}});
-  var d=await r.json();if(d.files&&d.files.length){_gFileId=d.files[0].id;return _gFileId;}return null;
-}
-async function _gDrivePush(payload){
-  var ok=await _gEnsureToken();if(!ok)return false;
-  var fid=await _gGetFolder();var eid=await _gGetFile(fid);var resp;
-  if(eid){resp=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+eid+'?uploadType=media',{method:'PATCH',headers:{Authorization:'Bearer '+_gAccessToken,'Content-Type':'application/json'},body:payload});}
-  else{var form=new FormData();form.append('metadata',new Blob([JSON.stringify({name:DRIVE_FILE_NAME,parents:[fid]})],{type:'application/json'}));form.append('file',new Blob([payload],{type:'application/json'}));resp=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{Authorization:'Bearer '+_gAccessToken},body:form});try{var nd=await resp.clone().json();if(nd.id)_gFileId=nd.id;}catch(e){}}
-  return resp&&resp.ok;
-}
-async function _gDrivePull(){
-  var ok=await _gEnsureToken();if(!ok)return null;
-  var fid=await _gGetFolder();var eid=await _gGetFile(fid);if(!eid)return null;
-  var resp=await fetch('https://www.googleapis.com/drive/v3/files/'+eid+'?alt=media',{headers:{Authorization:'Bearer '+_gAccessToken}});
-  return await resp.json();
-}
-function _applyCloudData(data){
-  profile=data.profile||profile;courses=data.courses||courses;records=data.records||records;
-  students=data.students||students;attendance=data.attendance||attendance;grades=data.grades||grades;
-  perCfg=data.perCfg||perCfg;
-  if(data.horarios)horarios=data.horarios;if(data.horNames)horNames=data.horNames;
-  if(data.perTemplate)perTemplate=data.perTemplate;if(data.asignacion)asignacion=data.asignacion;
-  if(data.seguimiento)seguimiento=data.seguimiento;if(data.voicesCfg)voicesCfg=data.voicesCfg;
-  if(data.syncCfg){var saved={webDriveConnected:syncCfg.webDriveConnected,googleEmail:syncCfg.googleEmail,googleName:syncCfg.googleName};syncCfg=Object.assign({},data.syncCfg,saved);}
-  saveScheduleData();saveSeg();save(true);
-  renderTP&&renderTP();renderSB&&renderSB();renderCurrentPage&&renderCurrentPage();
-  syncStatus='ok';lastSync=Date.now();
-}
-function _handleCloudConflict(data){
-  var localTs=Number(localStorage.getItem('bda_local_ts')||0);
-  var cloudTs=Number(data._ts||0);
-  var hasLocal=courses&&courses.length>0;
-  var hasCloud=data.courses&&data.courses.length>0;
-  if(!hasLocal){if(hasCloud){_applyCloudData(data);toast('Datos cargados desde Drive','s');}else{toast('Drive vacio - configura tu perfil y cursos','s');}return;}
-  if(!hasCloud){toast('Drive vacio - tus datos locales se conservan','s');return;}
-  if(cloudTs>localTs){_applyCloudData(data);toast('Datos actualizados desde Drive','s');return;}
-  if(localTs>cloudTs&&localTs>0&&cloudTs>0){
-    var localDate=new Date(localTs).toLocaleString('es-CO');
-    var cloudDate=new Date(cloudTs).toLocaleString('es-CO');
-    var msg='Diferencia encontrada.\n\nLocales: '+localDate+'\nDrive: '+cloudDate+'\n\nAceptar = usar datos del Drive\nCancelar = conservar datos locales';
-    if(confirm(msg)){_applyCloudData(data);toast('Datos del Drive aplicados','s');}
-    else{toast('Se conservaron los datos locales','s');setTimeout(function(){cloudPush();},1000);}
-    return;
-  }
-  _applyCloudData(data);toast('Datos cargados desde Drive','s');
-}
-async function cloudPush(){
-  syncStatus='syncing';
-  var localTs=Number(localStorage.getItem('bda_local_ts')||0);
-  var payload=JSON.stringify({profile:profile,courses:courses,records:records,students:students,attendance:attendance,grades:grades,perCfg:perCfg,perTemplate:perTemplate,horarios:horarios,horNames:horNames,asignacion:asignacion,seguimiento:seguimiento,syncCfg:syncCfg,voicesCfg:voicesCfg,_v:'2026',_d:new Date().toISOString(),_ts:localTs});
-  if(typeof AndroidDrive!=='undefined'){try{AndroidDrive.saveBackup(payload);}catch(e){syncStatus='error';toast('Error al guardar en Drive','e');}return;}
-  if(syncCfg.webDriveConnected){
-    try{var ok=await _gDrivePush(payload);if(ok){syncStatus='ok';lastSync=Date.now();localStorage.setItem('bda_last_push_ts',String(localTs));toast('Guardado en Drive','s');}else{syncStatus='error';toast('Error al guardar en Drive','e');}}
-    catch(e){syncStatus='error';toast('Error: '+e.message,'e');}
-    var sp=document.getElementById('panel-sync');if(sp&&sp.style.display!=='none')renderSyncPanel();return;
-  }
-  syncStatus='error';toast('Conecta con Google Drive para sincronizar','e');
-}
-async function cloudPull(){
-  if(typeof AndroidDrive!=='undefined'){syncStatus='syncing';AndroidDrive.loadBackup();return;}
-  if(syncCfg.webDriveConnected){
-    syncStatus='syncing';
-    try{var data=await _gDrivePull();if(data)_handleCloudConflict(data);else{syncStatus='ok';toast('Drive vacio - configura tu perfil y cursos','s');}}
-    catch(e){syncStatus='error';toast('Error al leer Drive: '+e.message,'e');}
-    var sp=document.getElementById('panel-sync');if(sp&&sp.style.display!=='none')renderSyncPanel();return;
-  }
-}
-function onBackupSaved(success){
-  if(success){syncStatus='ok';lastSync=Date.now();toast('Guardado en Drive','s');}
-  else{syncStatus='error';toast('Error al guardar en Drive','e');}
-  var sp=document.getElementById('panel-sync');if(sp&&sp.style.display!=='none')renderSyncPanel();
-}
-function onBackupLoaded(jsonStr){
-  syncStatus='idle';
-  if(!jsonStr){toast('Drive vacio','s');var sp=document.getElementById('panel-sync');if(sp&&sp.style.display!=='none')renderSyncPanel();return;}
-  try{
-    if(typeof jsonStr==='string'&&!jsonStr.startsWith('{')&&!jsonStr.startsWith('[')){try{jsonStr=atob(jsonStr);}catch(e){}}
-    var data=JSON.parse(jsonStr);_handleCloudConflict(data);
-  }catch(e){syncStatus='error';toast('Error al leer datos del Drive','e');}
-  var sp=document.getElementById('panel-sync');if(sp&&sp.style.display!=='none')renderSyncPanel();
-}
-function onAndroidSignIn(email,name){
-  syncCfg.googleEmail=email;syncCfg.googleName=name;saveSyncCfg();
-  renderSyncPanel&&renderSyncPanel();
-  var ov=document.getElementById('sync-welcome-ov');
-  if(ov&&ov.style.display!=='none'){_onWelcomeSignIn(email);return;}
-  toast('Conectado con Google Drive','s');
-}
-function onAndroidSignOut(){delete syncCfg.googleEmail;delete syncCfg.googleName;saveSyncCfg();renderSyncPanel&&renderSyncPanel();toast('Sesion cerrada','s');}
-function onAndroidSignInError(code){toast('Error al iniciar sesion con Google ('+code+')','e');var btn=document.getElementById('sw-drive-btn');if(btn){btn.disabled=false;btn.textContent='Conectar con Google';}}
-function androidSignIn(){if(typeof AndroidDrive!=='undefined')AndroidDrive.signIn();}
-function showSyncWelcome(){if(_isDriveReady()){_afterDriveConnect();return;}var ov=document.getElementById('sync-welcome-ov');if(ov)ov.style.display='flex';}
-function saveSyncWelcome(){
-  if(typeof AndroidDrive!=='undefined'){var btn=document.getElementById('sw-drive-btn');var st=document.getElementById('sw-drive-status');if(btn){btn.disabled=true;btn.textContent='Conectando...';}if(st)st.textContent='Esperando autorizacion...';AndroidDrive.signIn();return;}
-  webDriveSignIn();
-}
-function skipSyncWelcome(){toast('Conecta con Google Drive para continuar','e');}
-function _onWelcomeSignIn(email){var ov=document.getElementById('sync-welcome-ov');if(ov)ov.style.display='none';_afterDriveConnect();}
-function _afterDriveConnect(){
-  var hasSetup=!!localStorage.getItem(SK.s);
-  cloudPull();
-  if(!hasSetup){setTimeout(function(){if(!document.getElementById('wizard')||document.getElementById('wizard').style.display==='none')showOnboarding();},2500);}
-  else{setTimeout(function(){if(!document.querySelector('.page.on'))init(true);},2500);}
-}
-function clearSync(){if(!confirm('Desconectar? Los datos locales se conservan.'))return;webDriveSignOut();syncCfg={};saveSyncCfg();syncStatus='idle';renderSyncPanel&&renderSyncPanel();toast('Desconectado','s');}
-function renderSyncPanel(){
-  var el=document.getElementById('panel-sync');if(!el)return;
-  var syncSt=syncStatus||'idle';
-  var sCol=syncSt==='ok'?'var(--ok)':syncSt==='error'?'var(--er)':syncSt==='syncing'?'var(--ac)':'var(--ink3)';
-  var sTxt=syncSt==='ok'?'Conectado':syncSt==='error'?'Error':syncSt==='syncing'?'Sincronizando...':'';
-  var lastTxt=lastSync?'Ultima sinc: '+new Date(lastSync).toLocaleString('es-CO'):'';
-  var html='';
-  // Card 1: estado de sincronizacion
-  html+='<div class="card">';
-  html+='<div class="card-t">Estado de sincronizacion';
-  if(sTxt)html+='<span style="font-size:11px;font-weight:500;color:'+sCol+'">'+sTxt+'</span>';
-  html+='</div>';
-  if(lastTxt)html+='<div style="font-size:12px;color:var(--ink3)">'+lastTxt+'</div>';
-  html+='</div>';
-  // Card 2: Google Drive
-  html+='<div class="card">';
-  if(typeof AndroidDrive!=='undefined'){
-    var gEmail=AndroidDrive.checkSignInStatus();var gConn=!!gEmail;
-    html+='<div class="card-t">Google Drive';
-    if(gConn)html+='<span style="font-size:11px;font-weight:500;color:var(--ok)">Conectado</span>';
-    html+='</div>';
-    if(gConn){
-      html+='<div style="padding:10px;background:var(--aml);border-radius:8px;margin-bottom:10px"><div style="font-weight:600;font-size:13px">'+gEmail+'</div><div style="font-size:11px;color:var(--ink3)">Carpeta Bitacora Docente en tu Drive</div></div>';
-      html+='<div style="display:flex;gap:8px;flex-wrap:wrap">';
-      html+='<button class="btn" onclick="cloudPull()">Traer datos</button>';
-      html+='<button class="btn" onclick="cloudPush()">Enviar datos</button>';
-      html+='<button class="btn danger sm" onclick="AndroidDrive.signOut()">Desconectar</button>';
-      html+='</div>';
-    } else {
-      html+='<div style="font-size:13px;color:var(--ink2);margin-bottom:14px">Inicia sesion con Google para guardar en tu Drive.</div>';
-      html+='<button class="btn primary" onclick="androidSignIn()">Iniciar sesion con Google</button>';
-    }
-  } else if(syncCfg.webDriveConnected){
-    html+='<div class="card-t">Google Drive <span style="font-size:11px;font-weight:500;color:var(--ok)">Conectado</span></div>';
-    html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">';
-    html+='<button class="btn" onclick="cloudPull()">Traer datos</button>';
-    html+='<button class="btn" onclick="cloudPush()">Enviar datos</button>';
-    html+='<button class="btn danger sm" onclick="webDriveSignOut()">Desconectar</button>';
-    html+='</div>';
-    html+='<div style="font-size:12px;color:var(--ink3)">Carpeta Bitacora Docente en tu Google Drive.</div>';
-  } else {
-    html+='<div class="card-t">Google Drive</div>';
-    html+='<div style="font-size:13px;color:var(--ink2);margin-bottom:14px">Conecta con Google para sincronizar tus datos.</div>';
-    html+='<button class="btn primary" onclick="saveSyncWelcome()">Conectar con Google</button>';
-  }
-  html+='</div>';
-  el.innerHTML=html;
-}
-
-
 function init(skip){
-  loadScheduleData();
-  loadSeg();
-  load();
-  rebuildMdiaTipoSel();
-  // ── Gate 1: Licencia (primero que todo) ──
+  loadScheduleData();loadSeg();load();rebuildMdiaTipoSel();
   checkLicense(()=>{
-    // ── Gate 2: Onboarding (primera vez) ──
-    if(!localStorage.getItem(SK.s)&&!skip){
-      showOnboarding();return;
+    if(typeof AndroidDrive!=='undefined'){
+      var deviceEmail=AndroidDrive.checkSignInStatus();
+      if(!deviceEmail){AndroidDrive.signIn();return;}
+      syncCfg.googleEmail=deviceEmail;saveSyncCfg();
+      _afterDriveConnect();return;
     }
-    // ── Gate 3: PIN / Auth ──
+    if(!_isDriveReady()){showSyncWelcome();return;}
+    if(!localStorage.getItem(SK.s)&&!skip){cloudPull();showOnboarding();return;}
     checkAuthGate(()=>showWelcome(()=>_initMain(skip)));
   });
 }
@@ -11616,6 +11250,181 @@ try{window.moveTo(0,0);window.resizeTo(screen.availWidth,screen.availHeight);}ca
   });
 })();
 
+
+// ════════════════════════════════════════
+// SINCRONIZACION GOOGLE DRIVE
+// ════════════════════════════════════════
+var WEB_CLIENT_ID='437794734136-r7oh903t8sigm3gd4fsp0tn9uahsfmh0.apps.googleusercontent.com';
+var DRIVE_FOLDER_NAME='Bitacora Docente';
+var DRIVE_FILE_NAME='bitacora_docente_backup.json';
+var _gAT='',_gTE=0,_gFID='',_gEID='';
+
+function _isDriveReady(){return(typeof AndroidDrive!=='undefined'&&!!AndroidDrive.checkSignInStatus())||!!syncCfg.webDriveConnected;}
+
+function webDriveSignIn(){
+  if(typeof google==='undefined'){toast('Recarga la pagina e intenta de nuevo','e');return;}
+  var btn=document.getElementById('sw-drive-btn');var st=document.getElementById('sw-drive-status');
+  if(btn){btn.disabled=true;btn.textContent='Conectando...';}if(st)st.textContent='Esperando autorizacion...';
+  google.accounts.oauth2.initTokenClient({client_id:WEB_CLIENT_ID,scope:'https://www.googleapis.com/auth/drive.file',
+    callback:function(tr){
+      if(tr.error){if(btn){btn.disabled=false;btn.textContent='Conectar con Google';}if(st)st.textContent='';toast('Error al conectar','e');return;}
+      _gAT=tr.access_token;_gTE=Date.now()+(tr.expires_in-60)*1000;
+      syncCfg.webDriveConnected=true;saveSyncCfg();
+      var ov=document.getElementById('sync-welcome-ov');if(ov)ov.style.display='none';
+      toast('Conectado con Google Drive','s');_afterDriveConnect();
+    }
+  }).requestAccessToken();
+}
+
+function webDriveSignOut(){
+  if(_gAT&&typeof google!=='undefined')google.accounts.oauth2.revoke(_gAT,function(){});
+  _gAT='';_gTE=0;_gFID='';_gEID='';syncCfg.webDriveConnected=false;saveSyncCfg();
+  renderSyncPanel&&renderSyncPanel();toast('Sesion de Google cerrada','s');
+}
+
+async function _gEnsure(){
+  if(_gAT&&Date.now()<_gTE)return true;
+  return new Promise(function(res){google.accounts.oauth2.initTokenClient({client_id:WEB_CLIENT_ID,scope:'https://www.googleapis.com/auth/drive.file',prompt:'',callback:function(tr){if(tr.error){res(false);return;}_gAT=tr.access_token;_gTE=Date.now()+(tr.expires_in-60)*1000;res(true);}}).requestAccessToken();});
+}
+async function _gFolder(){
+  if(_gFID)return _gFID;
+  var q=encodeURIComponent("name='"+DRIVE_FOLDER_NAME+"' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  var d=await(await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id)',{headers:{Authorization:'Bearer '+_gAT}})).json();
+  if(d.files&&d.files.length){_gFID=d.files[0].id;return _gFID;}
+  var cd=await(await fetch('https://www.googleapis.com/drive/v3/files',{method:'POST',headers:{Authorization:'Bearer '+_gAT,'Content-Type':'application/json'},body:JSON.stringify({name:DRIVE_FOLDER_NAME,mimeType:'application/vnd.google-apps.folder'})})).json();
+  _gFID=cd.id;return _gFID;
+}
+async function _gFile(fid){
+  if(_gEID)return _gEID;
+  var q=encodeURIComponent("name='"+DRIVE_FILE_NAME+"' and '"+fid+"' in parents and trashed=false");
+  var d=await(await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id)',{headers:{Authorization:'Bearer '+_gAT}})).json();
+  if(d.files&&d.files.length){_gEID=d.files[0].id;return _gEID;}return null;
+}
+async function _gPush(payload){
+  var ok=await _gEnsure();if(!ok)return false;
+  var fid=await _gFolder();var eid=await _gFile(fid);var resp;
+  if(eid){resp=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+eid+'?uploadType=media',{method:'PATCH',headers:{Authorization:'Bearer '+_gAT,'Content-Type':'application/json'},body:payload});}
+  else{var form=new FormData();form.append('metadata',new Blob([JSON.stringify({name:DRIVE_FILE_NAME,parents:[fid]})],{type:'application/json'}));form.append('file',new Blob([payload],{type:'application/json'}));resp=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{Authorization:'Bearer '+_gAT},body:form});try{var nd=await resp.clone().json();if(nd.id)_gEID=nd.id;}catch(e){}}
+  return resp&&resp.ok;
+}
+async function _gPull(){
+  var ok=await _gEnsure();if(!ok)return null;
+  var fid=await _gFolder();var eid=await _gFile(fid);if(!eid)return null;
+  return await(await fetch('https://www.googleapis.com/drive/v3/files/'+eid+'?alt=media',{headers:{Authorization:'Bearer '+_gAT}})).json();
+}
+
+function _applyCloud(data){
+  profile=data.profile||profile;courses=data.courses||courses;records=data.records||records;
+  students=data.students||students;attendance=data.attendance||attendance;grades=data.grades||grades;
+  perCfg=data.perCfg||perCfg;
+  if(data.horarios)horarios=data.horarios;if(data.horNames)horNames=data.horNames;
+  if(data.perTemplate)perTemplate=data.perTemplate;if(data.asignacion)asignacion=data.asignacion;
+  if(data.seguimiento)seguimiento=data.seguimiento;if(data.voicesCfg)voicesCfg=data.voicesCfg;
+  if(data.syncCfg){var sv={webDriveConnected:syncCfg.webDriveConnected,googleEmail:syncCfg.googleEmail,googleName:syncCfg.googleName};syncCfg=Object.assign({},data.syncCfg,sv);}
+  saveScheduleData();saveSeg();save(true);
+  renderTP&&renderTP();renderSB&&renderSB();renderCurrentPage&&renderCurrentPage();
+  syncStatus='ok';lastSync=Date.now();
+}
+
+function _handleCloudConflict(data){
+  var lTs=Number(localStorage.getItem('bda_local_ts')||0);
+  var cTs=Number(data._ts||0);
+  var hasL=courses&&courses.length>0;var hasC=data.courses&&data.courses.length>0;
+  if(!hasL){if(hasC){_applyCloud(data);toast('Datos cargados desde Drive','s');}else{toast('Drive vacio - configura tu perfil y cursos','s');}return;}
+  if(!hasC){toast('Drive vacio - tus datos locales se conservan','s');return;}
+  if(cTs>lTs){_applyCloud(data);toast('Datos actualizados desde Drive','s');return;}
+  if(lTs>cTs&&lTs>0&&cTs>0){
+    var lD=new Date(lTs).toLocaleString('es-CO');var cD=new Date(cTs).toLocaleString('es-CO');
+    if(confirm('Diferencia encontrada.\nLocales: '+lD+'\nDrive: '+cD+'\n\nAceptar = usar datos del Drive\nCancelar = conservar datos locales')){
+      _applyCloud(data);toast('Datos del Drive aplicados','s');
+    } else {toast('Se conservaron los datos locales','s');setTimeout(cloudPush,1000);}
+    return;
+  }
+  _applyCloud(data);toast('Datos cargados desde Drive','s');
+}
+
+async function cloudPush(){
+  syncStatus='syncing';
+  var lTs=Number(localStorage.getItem('bda_local_ts')||0);
+  var payload=JSON.stringify({profile:profile,courses:courses,records:records,students:students,attendance:attendance,grades:grades,perCfg:perCfg,perTemplate:perTemplate,horarios:horarios,horNames:horNames,asignacion:asignacion,seguimiento:seguimiento,syncCfg:syncCfg,voicesCfg:voicesCfg,_v:'2026',_d:new Date().toISOString(),_ts:lTs});
+  if(typeof AndroidDrive!=='undefined'){try{AndroidDrive.saveBackup(payload);}catch(e){syncStatus='error';toast('Error al guardar en Drive','e');}return;}
+  if(syncCfg.webDriveConnected){
+    try{var ok=await _gPush(payload);if(ok){syncStatus='ok';lastSync=Date.now();localStorage.setItem('bda_last_push_ts',String(lTs));toast('Guardado en Drive','s');}else{syncStatus='error';toast('Error al guardar en Drive','e');}}
+    catch(e){syncStatus='error';toast('Error: '+e.message,'e');}
+    var sp=document.getElementById('panel-sync');if(sp&&sp.style.display!=='none')renderSyncPanel&&renderSyncPanel();return;
+  }
+  syncStatus='error';toast('Conecta con Google Drive para sincronizar','e');
+}
+
+async function cloudPull(){
+  if(typeof AndroidDrive!=='undefined'){syncStatus='syncing';AndroidDrive.loadBackup();return;}
+  if(syncCfg.webDriveConnected){
+    syncStatus='syncing';
+    try{var data=await _gPull();if(data)_handleCloudConflict(data);else{syncStatus='ok';toast('Drive vacio - configura tu perfil y cursos','s');}}
+    catch(e){syncStatus='error';toast('Error al leer Drive: '+e.message,'e');}
+    var sp=document.getElementById('panel-sync');if(sp&&sp.style.display!=='none')renderSyncPanel&&renderSyncPanel();return;
+  }
+}
+
+function onBackupSaved(success){
+  if(success){syncStatus='ok';lastSync=Date.now();toast('Guardado en Drive','s');}
+  else{syncStatus='error';toast('Error al guardar en Drive','e');}
+  var sp=document.getElementById('panel-sync');if(sp&&sp.style.display!=='none')renderSyncPanel&&renderSyncPanel();
+}
+
+function onBackupLoaded(jsonStr){
+  syncStatus='idle';
+  if(!jsonStr){toast('Drive vacio','s');var sp=document.getElementById('panel-sync');if(sp&&sp.style.display!=='none')renderSyncPanel&&renderSyncPanel();return;}
+  try{
+    if(typeof jsonStr==='string'&&!jsonStr.startsWith('{')&&!jsonStr.startsWith('[')){try{jsonStr=atob(jsonStr);}catch(e){}}
+    _handleCloudConflict(JSON.parse(jsonStr));
+  }catch(e){syncStatus='error';toast('Error al leer datos del Drive','e');}
+  var sp=document.getElementById('panel-sync');if(sp&&sp.style.display!=='none')renderSyncPanel&&renderSyncPanel();
+}
+
+function onAndroidSignIn(email,name){
+  syncCfg.googleEmail=email;syncCfg.googleName=name;saveSyncCfg();
+  var ov=document.getElementById('sync-welcome-ov');
+  if(ov&&ov.style.display!=='none'){_onWelcomeSignIn(email);return;}
+  toast('Conectado con Google Drive','s');renderSyncPanel&&renderSyncPanel();
+}
+function onAndroidSignOut(){delete syncCfg.googleEmail;delete syncCfg.googleName;saveSyncCfg();renderSyncPanel&&renderSyncPanel();toast('Sesion cerrada','s');}
+function onAndroidSignInError(code){toast('Error al iniciar sesion ('+code+')','e');var b=document.getElementById('sw-drive-btn');if(b){b.disabled=false;b.textContent='Conectar con Google';}}
+function androidSignIn(){if(typeof AndroidDrive!=='undefined')AndroidDrive.signIn();}
+
+function showSyncWelcome(){if(_isDriveReady()){_afterDriveConnect();return;}var ov=document.getElementById('sync-welcome-ov');if(ov)ov.style.display='flex';}
+function saveSyncWelcome(){if(typeof AndroidDrive!=='undefined'){var b=document.getElementById('sw-drive-btn');if(b){b.disabled=true;b.textContent='Conectando...';}AndroidDrive.signIn();return;}webDriveSignIn();}
+function skipSyncWelcome(){toast('Conecta con Google Drive para continuar','e');}
+function _onWelcomeSignIn(e){var ov=document.getElementById('sync-welcome-ov');if(ov)ov.style.display='none';_afterDriveConnect();}
+function _afterDriveConnect(){
+  var hs=!!localStorage.getItem(SK.s);cloudPull();
+  if(!hs){setTimeout(function(){if(!document.getElementById('wizard')||document.getElementById('wizard').style.display==='none')showOnboarding();},2500);}
+  else{setTimeout(function(){if(!document.querySelector('.page.on'))init(true);},2500);}
+}
+function clearSync(){if(!confirm('Desconectar? Los datos locales se conservan.'))return;webDriveSignOut();syncCfg={};saveSyncCfg();syncStatus='idle';renderSyncPanel&&renderSyncPanel();toast('Desconectado','s');}
+function renderSyncPanel(){
+  var el=document.getElementById('panel-sync');if(!el)return;
+  var sc=syncStatus||'idle';var sC=sc==='ok'?'var(--ok)':sc==='error'?'var(--er)':sc==='syncing'?'var(--ac)':'var(--ink3)';
+  var sT=sc==='ok'?'Conectado':sc==='error'?'Error':sc==='syncing'?'Sincronizando...':'';
+  var lT=lastSync?'Ultima sinc: '+new Date(lastSync).toLocaleString('es-CO'):'';
+  var h='<div class="card"><div class="card-t">Estado de sincronizacion';
+  if(sT)h+='<span style="font-size:11px;font-weight:500;color:'+sC+'">'+sT+'</span>';
+  h+='</div>';if(lT)h+='<div style="font-size:12px;color:var(--ink3)">'+lT+'</div>';h+='</div>';
+  h+='<div class="card">';
+  if(typeof AndroidDrive!=='undefined'){
+    var gE=AndroidDrive.checkSignInStatus();var gC=!!gE;
+    h+='<div class="card-t">Google Drive';if(gC)h+='<span style="font-size:11px;font-weight:500;color:var(--ok)">Conectado</span>';h+='</div>';
+    if(gC){h+='<div style="padding:10px;background:var(--aml);border-radius:8px;margin-bottom:10px"><div style="font-weight:600;font-size:13px">'+gE+'</div><div style="font-size:11px;color:var(--ink3)">Carpeta Bitacora Docente en tu Drive</div></div>';h+='<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="cloudPull()">Traer datos</button><button class="btn" onclick="cloudPush()">Enviar datos</button><button class="btn danger sm" onclick="AndroidDrive.signOut()">Desconectar</button></div>';}
+    else{h+='<div style="font-size:13px;color:var(--ink2);margin-bottom:14px">Inicia sesion con Google para guardar en tu Drive.</div><button class="btn primary" onclick="androidSignIn()">Iniciar sesion con Google</button>';}
+  } else if(syncCfg.webDriveConnected){
+    h+='<div class="card-t">Google Drive <span style="font-size:11px;font-weight:500;color:var(--ok)">Conectado</span></div>';
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0"><button class="btn" onclick="cloudPull()">Traer datos</button><button class="btn" onclick="cloudPush()">Enviar datos</button><button class="btn danger sm" onclick="webDriveSignOut()">Desconectar</button></div>';
+    h+='<div style="font-size:12px;color:var(--ink3)">Carpeta Bitacora Docente en tu Google Drive.</div>';
+  } else {
+    h+='<div class="card-t">Google Drive</div><div style="font-size:13px;color:var(--ink2);margin-bottom:14px">Conecta con Google para sincronizar tus datos.</div><button class="btn primary" onclick="saveSyncWelcome()">Conectar con Google</button>';
+  }
+  h+='</div>';el.innerHTML=h;
+}
 init();
 </script>
 
