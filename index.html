@@ -676,6 +676,7 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
 .pxc-cfg-row:last-child{border-bottom:none;}
 </style>
 <!-- xlsx loaded lazily on first export -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -4744,11 +4745,31 @@ function renderSyncPanel(){
     html+='</div>';
   }
 
-  // Card 2: Connection
+  // Card 2: Sincronización
   html+='<div class="card">';
-  html+='<div class="card-t">☁️ Conexión con la nube';
-  if(isConf)html+='<span style="font-size:11px;font-weight:500;color:'+sCol+'">'+sTxt+'</span>';
-  html+='</div>';
+  if(syncCfg.webDriveConnected){
+    html+='<div class="card-t">☁️ Google Drive <span style="font-size:11px;font-weight:500;color:var(--ok)">● Conectado</span></div>';
+    html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">';
+    html+='<button class="btn" onclick="cloudPull()">⬇ Traer datos</button>';
+    html+='<button class="btn" onclick="cloudPush()">⬆ Enviar datos</button>';
+    html+='<button class="btn danger sm" onclick="webDriveSignOut()">✕ Desconectar</button>';
+    html+='</div>';
+    html+='<div style="font-size:12px;color:var(--ink3)">Sincronizado con la carpeta <strong>Bitacora Docente</strong> en tu Google Drive.</div>';
+    html+='</div>';
+    html+='<div class="card">';
+    html+='<div class="card-t">🔗 URL de Apps Script (opcional)</div>';
+    html+='<div style="font-size:12px;color:var(--ink3);margin-bottom:10px">Alternativa si usas un Apps Script propio.</div>';
+  } else {
+    html+='<div class="card-t">☁️ Conexión con la nube';
+    if(isConf)html+='<span style="font-size:11px;font-weight:500;color:'+sCol+'">'+sTxt+'</span>';
+    html+='</div>';
+    html+='<div style="background:var(--aml);border-radius:10px;padding:14px;margin-bottom:14px">';
+    html+='<div style="font-size:13px;font-weight:600;margin-bottom:4px">🔑 Google Drive directo</div>';
+    html+='<div style="font-size:12px;color:var(--ink3);margin-bottom:10px">Conecta con tu Google Drive sin configurar URLs.</div>';
+    html+='<button class="btn primary" onclick="webDriveSignIn()">Conectar con Google</button>';
+    html+='</div>';
+    html+='<div style="font-size:12px;color:var(--ink2);font-weight:600;margin-bottom:10px">— o usar URL de Apps Script —</div>';
+  }
   html+='<div class="fg" style="margin-bottom:13px">';
   html+='<label>URL de sincronización</label>';
   html+='<input id="sync-url" placeholder="https://script.google.com/macros/s/..." value="'+esc(syncCfg.url||'')+'">';
@@ -5397,25 +5418,180 @@ function cloudSaveAll(){
   });
 }
 
+// ═══════════════════════════════════════════════
+// GOOGLE DRIVE WEB API
+// ═══════════════════════════════════════════════
+const WEB_CLIENT_ID='437794734136-r7oh903t8sigm3gd4fsp0tn9uahsfmh0.apps.googleusercontent.com';
+let _gAccessToken='';
+let _gTokenExpiry=0;
+let _gFolderId='';
+let _gFileId='';
+
+function webDriveSignIn(){
+  if(typeof google==='undefined'){toast('Google no disponible. Recarga la página.','e');return;}
+  const client=google.accounts.oauth2.initTokenClient({
+    client_id:WEB_CLIENT_ID,
+    scope:'https://www.googleapis.com/auth/drive.file',
+    callback:function(tr){
+      if(tr.error){toast('Error al conectar con Google','e');return;}
+      _gAccessToken=tr.access_token;
+      _gTokenExpiry=Date.now()+(tr.expires_in-60)*1000;
+      syncCfg.webDriveConnected=true;
+      saveSyncCfg();
+      renderSyncPanel();
+      toast('Conectado con Google Drive ✅','s');
+      cloudPull();
+    }
+  });
+  client.requestAccessToken();
+}
+
+function webDriveSignOut(){
+  if(_gAccessToken&&typeof google!=='undefined')
+    google.accounts.oauth2.revoke(_gAccessToken,function(){});
+  _gAccessToken='';_gTokenExpiry=0;_gFolderId='';_gFileId='';
+  syncCfg.webDriveConnected=false;
+  saveSyncCfg();renderSyncPanel();
+  toast('Sesión de Google cerrada','s');
+}
+
+async function _gEnsureToken(){
+  if(_gAccessToken&&Date.now()<_gTokenExpiry)return true;
+  return new Promise(function(resolve){
+    const client=google.accounts.oauth2.initTokenClient({
+      client_id:WEB_CLIENT_ID,
+      scope:'https://www.googleapis.com/auth/drive.file',
+      prompt:'',
+      callback:function(tr){
+        if(tr.error){resolve(false);return;}
+        _gAccessToken=tr.access_token;
+        _gTokenExpiry=Date.now()+(tr.expires_in-60)*1000;
+        resolve(true);
+      }
+    });
+    client.requestAccessToken();
+  });
+}
+
+async function _gGetFolder(){
+  if(_gFolderId)return _gFolderId;
+  const q=encodeURIComponent("name='" + DRIVE_FOLDER_NAME + "' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  const r=await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id)',
+    {headers:{Authorization:'Bearer '+_gAccessToken}});
+  const d=await r.json();
+  if(d.files&&d.files.length){_gFolderId=d.files[0].id;return _gFolderId;}
+  const cr=await fetch('https://www.googleapis.com/drive/v3/files',{
+    method:'POST',
+    headers:{Authorization:'Bearer '+_gAccessToken,'Content-Type':'application/json'},
+    body:JSON.stringify({name:'Bitacora Docente',mimeType:'application/vnd.google-apps.folder'})
+  });
+  const cd=await cr.json();
+  _gFolderId=cd.id;return _gFolderId;
+}
+
+async function _gGetFile(folderId){
+  if(_gFileId)return _gFileId;
+  const q=encodeURIComponent("name='" + DRIVE_FILE_NAME + "' and '"+folderId+"' in parents and trashed=false");
+  const r=await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id)',
+    {headers:{Authorization:'Bearer '+_gAccessToken}});
+  const d=await r.json();
+  if(d.files&&d.files.length){_gFileId=d.files[0].id;return _gFileId;}
+  return null;
+}
+
 async function cloudPush(){
-  if(!syncCfg.url){toast('Configura la URL primero','e');return;}
-  syncStatus='syncing';
   const localTs=Number(localStorage.getItem('bda_local_ts')||0);
+  const payload=JSON.stringify({profile,courses,records,students,attendance,grades,perCfg,
+    perTemplate,horarios,horNames,asignacion,seguimiento,syncCfg,voicesCfg,
+    _v:'2026',_d:new Date().toISOString(),_ts:localTs});
+
+  // Modo Drive Web
+  if(syncCfg.webDriveConnected){
+    syncStatus='syncing';
+    try{
+      const ok=await _gEnsureToken();
+      if(!ok){syncStatus='error';toast('Token expirado — vuelve a conectar','e');return;}
+      const fid=await _gGetFolder();
+      const eid=await _gGetFile(fid);
+      let resp;
+      if(eid){
+        resp=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+eid+'?uploadType=media',{
+          method:'PATCH',
+          headers:{Authorization:'Bearer '+_gAccessToken,'Content-Type':'application/json'},
+          body:payload
+        });
+      } else {
+        const form=new FormData();
+        form.append('metadata',new Blob([JSON.stringify({name:'bitacora_docente_backup.json',parents:[fid]})],{type:'application/json'}));
+        form.append('file',new Blob([payload],{type:'application/json'}));
+        resp=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{
+          method:'POST',headers:{Authorization:'Bearer '+_gAccessToken},body:form
+        });
+        const nd=await resp.clone().json().catch(function(){return {};});
+        if(nd.id)_gFileId=nd.id;
+      }
+      if(resp&&resp.ok){
+        syncStatus='ok';lastSync=Date.now();
+        localStorage.setItem('bda_last_push_ts',String(localTs));
+        toast('☁️ Guardado en Drive ✅','s');
+      } else {
+        syncStatus='error';toast('Error al guardar en Drive','e');
+      }
+    }catch(e){syncStatus='error';toast('Error: '+e.message,'e');}
+    const sp=document.getElementById('panel-sync');if(sp&&sp.style.display!=='none')renderSyncPanel();
+    return;
+  }
+
+  // Modo URL (Apps Script)
+  if(!syncCfg.url){toast('Conecta con Google Drive o configura la URL','e');return;}
+  syncStatus='syncing';
   try{
-    const payload=JSON.stringify({profile,courses,records,students,attendance,grades,perCfg,perTemplate,horarios,horNames,asignacion,seguimiento,syncCfg,voicesCfg,_v:'2026',_d:new Date().toISOString(),_ts:localTs});
     const resp=await fetch(syncCfg.url,{method:'POST',body:payload,headers:{'Content-Type':'text/plain'}});
     const data=await resp.json();
     if(data.ok){
       syncStatus='ok';lastSync=Date.now();
       localStorage.setItem('bda_last_push_ts',String(localTs));
       toast('☁️ Enviado a la nube ✅','s');
-    }
-    else{syncStatus='error';toast('Error: '+(data.error||'desconocido'),'e');}
+    } else {syncStatus='error';toast('Error: '+(data.error||'desconocido'),'e');}
   }catch(e){syncStatus='error';toast('Error de conexión. Verifica la URL.','e');}
   const sp=document.getElementById('panel-sync');if(sp&&sp.style.display!=='none')renderSyncPanel();
 }
 
 async function cloudPull(){
+  // Modo Drive Web
+  if(syncCfg.webDriveConnected){
+    syncStatus='syncing';
+    try{
+      const ok=await _gEnsureToken();
+      if(!ok){syncStatus='error';toast('Token expirado — vuelve a conectar','e');return;}
+      const fid=await _gGetFolder();
+      const eid=await _gGetFile(fid);
+      if(!eid){syncStatus='ok';toast('Drive vacío — usa ⬆ Enviar primero','s');return;}
+      const resp=await fetch('https://www.googleapis.com/drive/v3/files/'+eid+'?alt=media',
+        {headers:{Authorization:'Bearer '+_gAccessToken}});
+      const data=await resp.json();
+      if(data&&data.courses&&data.courses.length){
+        profile=data.profile||profile;courses=data.courses||courses;
+        records=data.records||records;students=data.students||students;
+        attendance=data.attendance||attendance;grades=data.grades||grades;
+        perCfg=data.perCfg||perCfg;
+        if(data.horarios)horarios=data.horarios;if(data.horNames)horNames=data.horNames;
+        if(data.perTemplate)perTemplate=data.perTemplate;
+        if(data.asignacion)asignacion=data.asignacion;
+        if(data.seguimiento)seguimiento=data.seguimiento;
+        if(data.voicesCfg)voicesCfg=data.voicesCfg;
+        saveScheduleData();saveSeg();save(true);
+        renderTP();renderSB();renderCurrentPage();
+        syncStatus='ok';lastSync=Date.now();
+        toast('☁️ Datos cargados desde Drive ✅','s');
+      } else {
+        syncStatus='ok';toast('Drive vacío — usa ⬆ Enviar primero','s');
+      }
+    }catch(e){syncStatus='error';toast('Error al leer Drive: '+e.message,'e');}
+    const sp=document.getElementById('panel-sync');if(sp&&sp.style.display!=='none')renderSyncPanel();
+    return;
+  }
+  // Modo URL
   if(!syncCfg.url)return;
   // Guard: if local data is newer than last successful push, warn before overwriting
   const localTs=Number(localStorage.getItem('bda_local_ts')||0);
