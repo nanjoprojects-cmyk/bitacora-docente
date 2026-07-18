@@ -1952,11 +1952,12 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
 
 
 <!-- PxC QUIZ CONFIG OVERLAY -->
-<div class="ov" id="pxc-cfg-ov">
-  <div class="modal" style="max-width:660px;width:95vw">
+<div class="ov bank-ov" id="pxc-cfg-ov">
+  <div class="bank-modal">
     <div class="mhdr"><div class="mtitle">📝 Configurar Prueba por Competencias</div>
       <button class="mx" onclick="document.getElementById('pxc-cfg-ov').classList.remove('open')">✕</button></div>
-    <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
+    <div class="bank-body">
+    <div style="display:flex;flex-direction:column;gap:12px;height:100%">
       <div style="font-size:13px;color:var(--ink2);line-height:1.6">
         Cada pregunta tiene hasta <strong>4 opciones (A–D)</strong> con puntaje independiente.
         La nota = <strong>(pts obtenidos / pts máximos) × 4 + 1</strong>.
@@ -1975,12 +1976,13 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
           <div style="font-size:11px;color:var(--ink3)">Se actualiza en tiempo real</div>
         </div>
       </div>
-      <div id="pxc-cfg-list" style="max-height:calc(100vh - 340px);overflow-y:auto;border:1px solid var(--br);border-radius:var(--rs);padding:10px 12px;display:flex;flex-direction:column;gap:8px"></div>
-      <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
+      <div id="pxc-cfg-list" style="flex:1;overflow-y:auto;border:1px solid var(--br);border-radius:var(--rs);padding:10px 12px;display:flex;flex-direction:column;gap:8px;min-height:0"></div>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;flex-shrink:0">
         <button class="btn primary" onclick="savePxcConfig()" style="flex:1">✓ Guardar configuración</button>
         <button class="btn" onclick="openPxcCopy()" title="Copiar esta prueba a otros cursos">📋 Copiar a cursos…</button>
         <button class="btn" onclick="document.getElementById('pxc-cfg-ov').classList.remove('open')">Cancelar</button>
       </div>
+    </div>
     </div>
   </div>
 </div>
@@ -2019,10 +2021,9 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
         <button class="btn sm primary" onclick="savePxcGrades()">💾 Guardar notas</button>
         <button class="btn sm" onclick="closePxcGrade()">✕</button>
       </div>
-      <!-- Alpha + student list -->
-      <div style="display:flex;gap:6px;flex:1;overflow:hidden">
-        <div class="bank-alpha" id="pxc-alpha"></div>
-        <div class="bank-students" id="pxc-list"></div>
+      <!-- Tabla de calificaciones -->
+      <div style="flex:1;overflow:auto;min-height:0">
+        <table id="pxc-list" style="width:100%;border-collapse:collapse;font-size:13px"></table>
       </div>
     </div>
   </div>
@@ -10860,15 +10861,22 @@ function renderPxcList(){
   const studs=getStuDs(cId,per);
   const el=document.getElementById('pxc-list');
   if(!el||!cfg)return;
-  _buildBankAlpha(studs,'pxc-alpha','pxc-list');
-
-  // Migrate questions if needed
   const preguntas=cfg.preguntas.map(pxcMigrateQuestion);
   const total=cfg.total;
 
-  el.innerHTML=studs.map((st,i)=>{
+  const thS='position:sticky;top:0;background:var(--sf2);padding:6px 8px;border:1px solid var(--br);font-size:11px;font-weight:700;color:var(--ink2);white-space:nowrap;z-index:2';
+  const tdS='padding:4px 5px;border:1px solid var(--br);text-align:center;vertical-align:middle';
+
+  const thead=`<thead><tr>
+    <th style="${thS};min-width:36px">#</th>
+    <th style="${thS};min-width:150px;text-align:left">Estudiante</th>
+    ${preguntas.map(p=>{const lv=pxcGetLevel(p,total);return `<th style="${thS};color:${lv.color}">P${p.id}</th>`;}).join('')}
+    <th style="${thS}">Pts</th>
+    <th style="${thS}">Nota</th>
+  </tr></thead>`;
+
+  const tbody=studs.map((st,i)=>{
     const resp=_pxcBuf[st.id]||{};
-    // Calculate score
     const obt=preguntas.reduce((s,p)=>{
       const sel=resp[String(p.id)];
       if(!sel)return s;
@@ -10876,59 +10884,30 @@ function renderPxcList(){
       return s+(opt?opt.pts:0);
     },0);
     const nota=calcNota(obt,total);
-    const pct=total>0?Math.round(obt/total*100):0;
-
-    return `<div class="bank-stu-row" data-stu-id="${st.id}" data-letter="${_stuLetter(st.nombre)}"
-      style="border:1px solid var(--br);border-radius:var(--rs)">
-      <div style="background:var(--sf);padding:8px 11px 5px;border-bottom:1px solid var(--br);border-radius:var(--rs) var(--rs) 0 0">
-        <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:11px;color:var(--ink3);min-width:18px">${i+1}</span>
-          <span style="flex:1;font-size:13px;font-weight:700;color:var(--ink)">${esc(st.nombre)}</span>
-          <span style="font-size:11px;color:var(--ink3)">${obt.toFixed(1)}/${total.toFixed(1)}</span>
-          <span id="pxcn-${st.id}" class="pn ${nota!==null?notaCls(nota):'em'}" style="font-size:13px">${nota!==null?nota.toFixed(1):'—'}</span>
-        </div>
-        <div style="height:3px;background:var(--br);border-radius:2px;margin-top:5px;overflow:hidden">
-          <div id="pxcb-${st.id}" style="height:100%;width:${pct}%;background:var(--ac);border-radius:2px"></div>
-        </div>
-      </div>
-      <div style="padding:8px 11px;display:flex;flex-direction:column;gap:5px">
-        ${preguntas.map(p=>{
-          const lv=pxcGetLevel(p,total);
-          const sel=resp[String(p.id)]||null;
-          return `<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
-            <span style="font-size:11px;color:${lv.color};font-weight:700;min-width:22px">P${p.id}</span>
-            ${p.opts.map(o=>{
-              const isSel=sel===o.lbl;
-              const intensity=p.maxPts>0?o.pts/p.maxPts:0;
-              // Color with intensity
-              const bg=o.pts===0?'var(--sf2)':
-                `rgba(${hexToRgb(lv.bg)},${0.2+intensity*0.8})`;
-              const border=o.pts===0?'var(--br)':
-                `rgba(${hexToRgb(lv.border)},${0.3+intensity*0.7})`;
-              const color=o.pts===0?'var(--ink3)':lv.color;
-              return `<button onclick="pxcSelectOpt('${st.id}',${p.id},'${o.lbl}')"
-                style="min-width:36px;padding:3px 6px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;
-                border:2px solid ${isSel?lv.border:border};
-                background:${isSel?lv.bg:bg};
-                color:${isSel?lv.color:color};
-                box-shadow:${isSel?'0 0 0 2px '+lv.border:' none'};
-                transition:all .1s">
-                <div>${o.lbl}</div>
-                <div style="font-size:9px;font-weight:400">${o.pts>0?o.pts+'pt':''}</div>
-              </button>`;
-            }).join('')}
-            <button onclick="pxcSelectOpt('${st.id}',${p.id},null)"
-              style="min-width:36px;padding:3px 6px;border-radius:6px;cursor:pointer;font-size:10px;
-              border:2px solid ${!sel?'var(--ink3)':'var(--br)'};
-              background:${!sel?'var(--sf2)':'var(--sf)'};
-              color:var(--ink3);transition:all .1s">
-              —
-            </button>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>`;
+    return `<tr>
+      <td style="${tdS};font-size:11px;color:var(--ink3)">${i+1}</td>
+      <td style="${tdS};text-align:left;font-weight:600;white-space:nowrap">${esc(st.nombre)}</td>
+      ${preguntas.map(p=>{
+        const lv=pxcGetLevel(p,total);
+        const sel=resp[String(p.id)]||'';
+        const selOpt=sel?p.opts.find(o=>o.lbl===sel):null;
+        const selPts=selOpt?selOpt.pts:null;
+        const intensity=selPts!==null&&p.maxPts>0?selPts/p.maxPts:0;
+        const bg=selPts===null?'var(--sf)':selPts===0?'var(--sf2)':`rgba(${hexToRgb(lv.bg)},${0.2+intensity*0.8})`;
+        return `<td style="${tdS};background:${bg};padding:2px 4px">
+          <select onchange="pxcSelectOpt('${st.id}',${p.id},this.value)"
+            style="border:none;background:transparent;font-size:11px;font-weight:700;color:${sel?lv.color:'var(--ink3)'};cursor:pointer;width:100%">
+            <option value="">—</option>
+            ${p.opts.map(o=>`<option value="${o.lbl}"${sel===o.lbl?' selected':''}>${o.lbl}${o.pts>0?' ('+o.pts+'pt)':''}</option>`).join('')}
+          </select>
+        </td>`;
+      }).join('')}
+      <td id="pxco-${st.id}" style="${tdS};font-size:11px;color:var(--ink2);white-space:nowrap">${obt.toFixed(1)}/${total.toFixed(1)}</td>
+      <td id="pxcn-${st.id}" class="pn ${nota!==null?notaCls(nota):'em'}" style="${tdS};font-size:13px;font-weight:700">${nota!==null?nota.toFixed(1):'—'}</td>
+    </tr>`;
   }).join('');
+
+  el.innerHTML=thead+'<tbody>'+tbody+'</tbody>';
 }
 
 function hexToRgb(hex){
@@ -10939,9 +10918,9 @@ function hexToRgb(hex){
 function pxcSelectOpt(stuId,qId,optLbl){
   if(!_pxcBuf[stuId])_pxcBuf[stuId]={};
   const key=String(qId);
-  if(optLbl===null){delete _pxcBuf[stuId][key];}
+  if(!optLbl||optLbl===null){delete _pxcBuf[stuId][key];}
   else{_pxcBuf[stuId][key]=optLbl;}
-  // Actualizar score y barra de progreso sin re-render completo
+  // Actualizar solo score y nota sin re-render completo
   const cfg=getGrD(_pxc.cId,_pxc.asig,_pxc.per).pxcConfig;
   if(!cfg)return;
   const preguntas=cfg.preguntas.map(pxcMigrateQuestion);
@@ -10953,21 +10932,31 @@ function pxcSelectOpt(stuId,qId,optLbl){
     return s+(opt?opt.pts:0);
   },0);
   const nota=calcNota(obt,cfg.total);
-  const pct=cfg.total>0?Math.round(obt/cfg.total*100):0;
   const nEl=document.getElementById('pxcn-'+stuId);
-  const bEl=document.getElementById('pxcb-'+stuId);
+  const oEl=document.getElementById('pxco-'+stuId);
   if(nEl){nEl.textContent=nota!==null?nota.toFixed(1):'—';nEl.className='pn '+(nota!==null?notaCls(nota):'em');}
-  if(bEl)bEl.style.width=pct+'%';
-  // Re-render solo este estudiante para actualizar selección visual
+  if(oEl)oEl.textContent=obt.toFixed(1)+'/'+cfg.total.toFixed(1);
+}
+function pxcToggle(stuId,qId){pxcSelectOpt(stuId,qId,'A');}
+function pxcToggleAll(stuId){}
+function pxcMarkAll(correct){
+  const cfg=getGrD(_pxc.cId,_pxc.asig,_pxc.per).pxcConfig;
+  if(!cfg)return;
+  const studs=getStuDs(_pxc.cId,_pxc.per);
+  const preguntas=cfg.preguntas.map(pxcMigrateQuestion);
+  studs.forEach(st=>{
+    if(!_pxcBuf[st.id])_pxcBuf[st.id]={};
+    if(correct){
+      preguntas.forEach(p=>{
+        const best=p.opts.reduce((b,o)=>o.pts>b.pts?o:b,p.opts[0]);
+        _pxcBuf[st.id][String(p.id)]=best.lbl;
+      });
+    } else {
+      _pxcBuf[st.id]={};
+    }
+  });
   renderPxcList();
 }
-
-function pxcToggle(stuId,qId){
-  // Legacy — redirect to new system
-  pxcSelectOpt(stuId,qId,'A');
-}
-function pxcToggleAll(stuId){}
-
 function savePxcGrades(){
   const{cId,asig,per}=_pxc;
   const data=getGrD(cId,asig,per);
