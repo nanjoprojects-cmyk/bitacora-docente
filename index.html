@@ -11122,7 +11122,9 @@ function init(skip){
       syncCfg.googleEmail=deviceEmail;saveSyncCfg();
       _afterDriveConnect();return;
     }
+    // Web: verificar Drive
     if(!_isDriveReady()){showSyncWelcome();return;}
+    // Web: si tiene datos → app; si no → onboarding web
     if(!localStorage.getItem(SK.s)&&!skip){cloudPull();showOnboarding();return;}
     checkAuthGate(()=>showWelcome(()=>_initMain(skip)));
   });
@@ -11322,8 +11324,15 @@ function _applyCloud(data){
   if(data.seguimiento)seguimiento=data.seguimiento;if(data.voicesCfg)voicesCfg=data.voicesCfg;
   if(data.syncCfg){var sv={webDriveConnected:syncCfg.webDriveConnected,googleEmail:syncCfg.googleEmail,googleName:syncCfg.googleName};syncCfg=Object.assign({},data.syncCfg,sv);}
   saveScheduleData();saveSeg();save(true);
+  // Marcar setup como completado si hay datos reales
+  if(courses&&courses.length>0){localStorage.setItem(SK.s,'1');}
   renderTP&&renderTP();renderSB&&renderSB();renderCurrentPage&&renderCurrentPage();
   syncStatus='ok';lastSync=Date.now();
+  // Notificar que cloudPull completó (para _afterDriveConnect)
+  if(window._driveConnectPending){
+    window._driveConnectPending=false;
+    setTimeout(_enterAppAfterDrive,300);
+  }
 }
 
 function _handleCloudConflict(data){
@@ -11374,7 +11383,13 @@ function onBackupSaved(success){
 
 function onBackupLoaded(jsonStr){
   syncStatus='idle';
-  if(!jsonStr){toast('Drive vacio','s');var sp=document.getElementById('panel-sync');if(sp&&sp.style.display!=='none')renderSyncPanel&&renderSyncPanel();return;}
+  if(!jsonStr){
+    toast('Drive vacio - configura tu perfil y cursos','s');
+    var sp=document.getElementById('panel-sync');if(sp&&sp.style.display!=='none')renderSyncPanel&&renderSyncPanel();
+    // Notificar que cloudPull completó (Drive vacío)
+    if(window._driveConnectPending){window._driveConnectPending=false;setTimeout(_enterAppAfterDrive,300);}
+    return;
+  }
   try{
     if(typeof jsonStr==='string'&&!jsonStr.startsWith('{')&&!jsonStr.startsWith('[')){try{jsonStr=atob(jsonStr);}catch(e){}}
     _handleCloudConflict(JSON.parse(jsonStr));
@@ -11397,9 +11412,35 @@ function saveSyncWelcome(){if(typeof AndroidDrive!=='undefined'){var b=document.
 function skipSyncWelcome(){toast('Conecta con Google Drive para continuar','e');}
 function _onWelcomeSignIn(e){var ov=document.getElementById('sync-welcome-ov');if(ov)ov.style.display='none';_afterDriveConnect();}
 function _afterDriveConnect(){
-  var hs=!!localStorage.getItem(SK.s);cloudPull();
-  if(!hs){setTimeout(function(){if(!document.getElementById('wizard')||document.getElementById('wizard').style.display==='none')showOnboarding();},2500);}
-  else{setTimeout(function(){if(!document.querySelector('.page.on'))init(true);},2500);}
+  // Registrar callback para cuando cloudPull termine
+  window._driveConnectPending=true;
+  cloudPull();
+  // Fallback: si cloudPull tarda más de 8 segundos, entrar igual
+  setTimeout(function(){
+    if(!window._driveConnectPending)return; // ya resuelto
+    window._driveConnectPending=false;
+    _enterAppAfterDrive();
+  },8000);
+}
+
+function _enterAppAfterDrive(){
+  if(document.querySelector('.page.on'))return; // ya está en la app
+  localStorage.setItem(SK.s,'1');
+  if(courses&&courses.length>0){
+    // Tiene datos → entrar a la app directamente
+    checkAuthGate(function(){showWelcome(function(){_initMain(true);});});
+  } else {
+    // Drive vacío → entrar y abrir configuración
+    checkAuthGate(function(){
+      showWelcome(function(){
+        _initMain(false);
+        setTimeout(function(){
+          var cfgBtn=document.querySelector('[onclick*="showCfg"]');
+          if(cfgBtn)cfgBtn.click();
+        },800);
+      });
+    });
+  }
 }
 function clearSync(){if(!confirm('Desconectar? Los datos locales se conservan.'))return;webDriveSignOut();syncCfg={};saveSyncCfg();syncStatus='idle';renderSyncPanel&&renderSyncPanel();toast('Desconectado','s');}
 function renderSyncPanel(){
