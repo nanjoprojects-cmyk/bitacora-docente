@@ -4810,7 +4810,8 @@ function showLockScreen(cb){
 // Auth gate: called at start of init()
 function checkAuthGate(afterFn){
   if(!localStorage.getItem(SK_PIN)){afterFn();return;}
-  if(sessionStorage.getItem('bda_unlocked')==='1'){afterFn();return;}
+  // Android: ignorar sessionStorage — siempre pedir PIN al abrir
+  if(typeof AndroidDrive==='undefined'&&sessionStorage.getItem('bda_unlocked')==='1'){afterFn();return;}
   showLockScreen(afterFn);
 }
 
@@ -11369,7 +11370,7 @@ async function cloudPull(){
   if(typeof AndroidDrive!=='undefined'){syncStatus='syncing';AndroidDrive.loadBackup();return;}
   if(syncCfg.webDriveConnected){
     syncStatus='syncing';
-    try{var data=await _gPull();if(data)_handleCloudConflict(data);else{syncStatus='ok';toast('Drive vacio - configura tu perfil y cursos','s');}}
+    try{var data=await _gPull();if(data){_handleCloudConflict(data);}else{syncStatus='ok';toast('Drive vacio','s');if(window._driveConnectPending){window._driveConnectPending=false;setTimeout(_enterAppAfterDrive,300);}}}
     catch(e){syncStatus='error';toast('Error al leer Drive: '+e.message,'e');}
     var sp=document.getElementById('panel-sync');if(sp&&sp.style.display!=='none')renderSyncPanel&&renderSyncPanel();return;
   }
@@ -11424,22 +11425,24 @@ function _afterDriveConnect(){
 }
 
 function _enterAppAfterDrive(){
-  if(document.querySelector('.page.on'))return; // ya está en la app
-  localStorage.setItem(SK.s,'1');
+  if(document.querySelector('.page.on'))return;
+
   if(courses&&courses.length>0){
-    // Tiene datos → entrar a la app directamente
-    checkAuthGate(function(){showWelcome(function(){_initMain(true);});});
+    // Tiene datos → marcar setup completo → PIN → Mi Día
+    localStorage.setItem(SK.s,'1');
+    checkAuthGate(function(){_initMain(true);});
+  } else if(typeof AndroidDrive!=='undefined'){
+    // Android + Drive vacío → Config → Sincronización (traer datos existentes)
+    localStorage.setItem(SK.s,'1');
+    _initMain(true);
+    setTimeout(function(){
+      showPage('config');
+      setTimeout(function(){cfgTab&&cfgTab('sync');renderSyncPanel&&renderSyncPanel();},300);
+    },500);
   } else {
-    // Drive vacío → entrar y abrir configuración
-    checkAuthGate(function(){
-      showWelcome(function(){
-        _initMain(false);
-        setTimeout(function(){
-          var cfgBtn=document.querySelector('[onclick*="showCfg"]');
-          if(cfgBtn)cfgBtn.click();
-        },800);
-      });
-    });
+    // Web + Drive vacío (primera vez real) → mostrar asistente de configuración
+    localStorage.removeItem(SK.s);
+    showOnboarding();
   }
 }
 function clearSync(){if(!confirm('Desconectar? Los datos locales se conservan.'))return;webDriveSignOut();syncCfg={};saveSyncCfg();syncStatus='idle';renderSyncPanel&&renderSyncPanel();toast('Desconectado','s');}
