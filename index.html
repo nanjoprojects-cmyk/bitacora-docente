@@ -1953,10 +1953,10 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
 
 <!-- PxC QUIZ CONFIG OVERLAY -->
 <div class="ov" id="pxc-cfg-ov">
-  <div class="modal" style="max-width:620px">
+  <div class="modal" style="max-width:660px;max-height:92vh;display:flex;flex-direction:column">
     <div class="mhdr"><div class="mtitle">📝 Configurar Prueba por Competencias</div>
       <button class="mx" onclick="document.getElementById('pxc-cfg-ov').classList.remove('open')">✕</button></div>
-    <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
+    <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px;flex:1;min-height:0;overflow:hidden">
       <div style="font-size:13px;color:var(--ink2);line-height:1.6">
         Cada pregunta tiene hasta <strong>4 opciones (A–D)</strong> con puntaje independiente.
         La nota = <strong>(pts obtenidos / pts máximos) × 4 + 1</strong>.
@@ -1975,8 +1975,8 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
           <div style="font-size:11px;color:var(--ink3)">Se actualiza en tiempo real</div>
         </div>
       </div>
-      <div id="pxc-cfg-list" style="max-height:380px;overflow-y:auto;border:1px solid var(--br);border-radius:var(--rs);padding:10px 12px;display:flex;flex-direction:column;gap:8px"></div>
-      <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
+      <div id="pxc-cfg-list" style="flex:1;min-height:0;overflow-y:auto;border:1px solid var(--br);border-radius:var(--rs);padding:10px 12px;display:flex;flex-direction:column;gap:8px"></div>
+      <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap;flex-shrink:0">
         <button class="btn primary" onclick="savePxcConfig()" style="flex:1">✓ Guardar configuración</button>
         <button class="btn" onclick="openPxcCopy()" title="Copiar esta prueba a otros cursos">📋 Copiar a cursos…</button>
         <button class="btn" onclick="document.getElementById('pxc-cfg-ov').classList.remove('open')">Cancelar</button>
