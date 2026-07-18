@@ -11115,6 +11115,10 @@ function refreshAutoAttSER(cId, asig, per){
 
 function init(skip){
   loadScheduleData();loadSeg();load();rebuildMdiaTipoSel();
+  // En Android: limpiar sesión desbloqueada para que el PIN siempre se solicite
+  if(typeof AndroidDrive!=='undefined'&&!skip){
+    sessionStorage.removeItem('bda_unlocked');
+  }
   checkLicense(()=>{
     if(typeof AndroidDrive!=='undefined'){
       var deviceEmail=AndroidDrive.checkSignInStatus();
@@ -11185,14 +11189,10 @@ function _initMain(skip){
   fillGlobalPerSel(); // poblar selector de período global en Mi Día
   // Restore last active section if tab was suspended (sessionStorage survives suspension but not close)
   const lastPage=sessionStorage.getItem('bda_last_page');
-  const hasSchedule=Object.keys(horarios).some(k=>horarios[k]&&horarios[k].length>0);
-  const hasAsig=Object.keys(asignacion).length>0;
   if(lastPage&&document.getElementById('page-'+lastPage)){
     showPage(lastPage);
-  } else if(hasSchedule&&hasAsig){
-    showPage('mdia');
   } else {
-    setView('GENERAL');
+    showPage('mdia');
   }
   setTimeout(function(){if(_isDriveReady())cloudPull();},800);
   if(!localStorage.getItem(SK_HELP))setTimeout(startTour,800);
