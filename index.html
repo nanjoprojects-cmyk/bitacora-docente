@@ -660,7 +660,11 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
 .pxc-grid{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;}
 .pxc-q{width:44px;height:48px;border-radius:8px;border:2px solid var(--br);background:var(--sf2);cursor:pointer;font-size:12px;font-weight:700;color:var(--ink3);display:flex;flex-direction:column;align-items:center;justify-content:center;-webkit-user-select:none;user-select:none;transition:background .12s,color .12s,border-color .12s;}
 /* Tier borders when NOT selected */
-/* PxC 5-level difficulty scale */
+.pxc-opt-btn{min-width:38px;padding:4px 8px;border-radius:7px;border:2px solid var(--br);background:var(--sf2);cursor:pointer;font-size:11px;font-weight:700;color:var(--ink3);transition:all .12s;text-align:center;display:flex;flex-direction:column;align-items:center;gap:1px;}
+.pxc-opt-btn:hover{filter:brightness(1.05);}
+.pxc-opt-btn.selected{border-width:2px;box-shadow:0 0 0 2px var(--ac);}
+.pxc-opt-btn.none-sel{background:var(--sf);color:var(--ink3);border-color:var(--br);}
+/* PxC 5-level difficulty scale*/
 /* Unselected: subtle border + tint */
 .pxc-q.pxc-t-1{border-color:#6DB88A;background:var(--sf);color:#2E7D52;}
 .pxc-q.pxc-t-2{border-color:#D4B93A;background:var(--sf);color:#7D6212;}
@@ -1949,12 +1953,14 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
 
 <!-- PxC QUIZ CONFIG OVERLAY -->
 <div class="ov" id="pxc-cfg-ov">
-  <div class="modal" style="max-width:520px">
+  <div class="modal" style="max-width:620px">
     <div class="mhdr"><div class="mtitle">📝 Configurar Prueba por Competencias</div>
       <button class="mx" onclick="document.getElementById('pxc-cfg-ov').classList.remove('open')">✕</button></div>
-    <div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px">
+    <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
       <div style="font-size:13px;color:var(--ink2);line-height:1.6">
-        Define el número de preguntas y los puntos de cada una. La nota se calcula automáticamente: <strong>(pts obtenidos / pts totales) × 4 + 1</strong>.
+        Cada pregunta tiene hasta <strong>4 opciones (A–D)</strong> con puntaje independiente.
+        La nota = <strong>(pts obtenidos / pts máximos) × 4 + 1</strong>.
+        Los pts máximos = suma del mayor puntaje de cada pregunta.
       </div>
       <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
         <div class="fg" style="flex:0 0 auto">
@@ -1963,16 +1969,13 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
             style="width:80px;font-size:18px;font-weight:700;text-align:center"
             oninput="pxcRenderCfgList()">
         </div>
-        <div class="fg" style="flex:0 0 auto">
-          <label>Puntos por pregunta (default)</label>
-          <input autocomplete="off" id="pxc-defpts" type="number" min="0.5" max="50" step="0.5" value="1"
-            style="width:80px;font-size:18px;font-weight:700;text-align:center"
-            oninput="pxcApplyDefault()">
+        <div style="flex:1;min-width:200px;background:var(--aml);border-radius:var(--rs);padding:10px 14px">
+          <div style="font-size:11px;color:var(--ink3);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Puntos máximos totales</div>
+          <div id="pxc-total-display" style="font-size:22px;font-weight:800;color:var(--ac)">0</div>
+          <div style="font-size:11px;color:var(--ink3)">Se actualiza en tiempo real</div>
         </div>
-        <button class="btn sm" onclick="pxcApplyDefault()">Aplicar a todas</button>
       </div>
-      <div style="font-size:12px;color:var(--ink3)">Puedes editar los puntos individualmente si hay preguntas con distinta puntuación.</div>
-      <div id="pxc-cfg-list" style="max-height:300px;overflow-y:auto;border:1px solid var(--br);border-radius:var(--rs);padding:8px 12px;display:flex;flex-direction:column;gap:0"></div>
+      <div id="pxc-cfg-list" style="max-height:380px;overflow-y:auto;border:1px solid var(--br);border-radius:var(--rs);padding:10px 12px;display:flex;flex-direction:column;gap:8px"></div>
       <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
         <button class="btn primary" onclick="savePxcConfig()" style="flex:1">✓ Guardar configuración</button>
         <button class="btn" onclick="openPxcCopy()" title="Copiar esta prueba a otros cursos">📋 Copiar a cursos…</button>
@@ -10652,14 +10655,24 @@ function openPxcConfig(cId,asig,per){
   _pxc={cId,asig,per};
   const data=getGrD(cId,asig,per);
   const cfg=data.pxcConfig||{preguntas:[]};
-  const nq=cfg.preguntas.length||20;
+  const nq=cfg.preguntas.length||10;
   document.getElementById('pxc-nq').value=nq;
-  document.getElementById('pxc-defpts').value=1;
-  // Build list from existing config or defaults
-  _pxcCfgPreguntas=cfg.preguntas.length
-    ?cfg.preguntas.map(p=>({id:p.id,pts:p.pts}))
-    :Array.from({length:nq},(_,i)=>({id:i+1,pts:1}));
   _pxcCustomLabels=Object.assign({},cfg.customLabels||{});
+  if(cfg.preguntas.length){
+    _pxcCfgPreguntas=cfg.preguntas.map(p=>{
+      if(!p.opts){
+        // Migrar formato viejo
+        return {id:p.id,opts:[{lbl:'A',pts:p.pts||0},{lbl:'B',pts:0},{lbl:'C',pts:0},{lbl:'D',pts:0}],maxPts:p.pts||0,nivel:p.nivel||null};
+      }
+      return {id:p.id,opts:p.opts.map(o=>({lbl:o.lbl,pts:o.pts})),maxPts:p.maxPts||0,nivel:p.nivel||null};
+    });
+  } else {
+    _pxcCfgPreguntas=Array.from({length:nq},(_,i)=>({
+      id:i+1,
+      opts:[{lbl:'A',pts:0},{lbl:'B',pts:0},{lbl:'C',pts:0},{lbl:'D',pts:0}],
+      maxPts:0,nivel:null
+    }));
+  }
   pxcRenderCfgList();
   document.getElementById('pxc-cfg-ov').classList.add('open');
 }
@@ -10671,77 +10684,111 @@ function pxcSetLabel(tierT,val){
 }
 
 function pxcRenderCfgList(){
-  const nq=Math.min(100,Math.max(1,parseInt(document.getElementById('pxc-nq').value)||20));
-  const defpts=parseFloat(document.getElementById('pxc-defpts').value)||1;
-  while(_pxcCfgPreguntas.length<nq) _pxcCfgPreguntas.push({id:_pxcCfgPreguntas.length+1,pts:defpts});
+  const nq=Math.min(100,Math.max(1,parseInt(document.getElementById('pxc-nq')?.value)||10));
+  // Sync array length
+  while(_pxcCfgPreguntas.length<nq){
+    const id=_pxcCfgPreguntas.length+1;
+    _pxcCfgPreguntas.push({id,opts:[{lbl:'A',pts:0},{lbl:'B',pts:0},{lbl:'C',pts:0},{lbl:'D',pts:0}],nivel:null});
+  }
   _pxcCfgPreguntas=_pxcCfgPreguntas.slice(0,nq);
-  const totalPts=_pxcCfgPreguntas.reduce((s,p)=>s+p.pts,0);
-  // Build tier preview with editable labels
-  const uniq=[...new Set(_pxcCfgPreguntas.map(p=>p.pts))].sort((a,b)=>a-b);
-  const maxLvl=uniq.length>4?5:4;
-  const available=PXC_LEVELS.slice(0,maxLvl);
-  const tierRows=uniq.map((v,i)=>{
-    const lvlIdx=uniq.length===1?0:Math.round(i/(uniq.length-1)*(maxLvl-1));
-    const base=available[lvlIdx];
-    const curLabel=(_pxcCustomLabels&&_pxcCustomLabels[base.t])||base.label;
-    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--br)">
-      <div style="width:28px;height:28px;border-radius:6px;background:${base.color};flex-shrink:0;border:1px solid rgba(0,0,0,.1)"></div>
-      <span style="font-size:12px;color:var(--ink3);min-width:60px">${v} pt${v===1?'':'s'}</span>
-      <input type="text" value="${esc(curLabel)}" maxlength="20" placeholder="${base.label}"
-        style="flex:1;font-size:12px;font-weight:600;padding:3px 8px;border-radius:var(--rs);border:1px solid var(--br)"
-        oninput="pxcSetLabel('${base.t}',this.value)" autocomplete="off"
-        title="Etiqueta para este nivel de dificultad">
-      <span style="font-size:10px;color:var(--ink3)">Nivel ${i+1}</span>
+
+  const total=pxcCalcTotal();
+  const tEl=document.getElementById('pxc-total-display');
+  if(tEl)tEl.textContent=total.toFixed(1)+' pts';
+
+  const NIVEL_LABELS=['','Básico','Intermedio','Alto','Avanzado'];
+  const NIVEL_COLORS=['','#2E7D52','#7D6212','#7D4912','#8B2D27'];
+
+  const el=document.getElementById('pxc-cfg-list');
+  if(!el)return;
+  el.innerHTML=_pxcCfgPreguntas.map((p,i)=>{
+    const maxPts=Math.max(...p.opts.map(o=>o.pts));
+    // Auto-suggest nivel based on weight
+    const weight=total>0?maxPts/total*100:0;
+    const autoNivel=weight<=0?0:weight<20?1:weight<40?2:weight<65?3:4;
+    const nivelEff=p.nivel||autoNivel;
+    const nivelColor=NIVEL_COLORS[nivelEff]||'#999';
+    return `<div style="border:1px solid var(--br);border-radius:var(--rs);overflow:hidden">
+      <div style="background:var(--sf);padding:6px 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:12px;font-weight:700;color:var(--ink2);min-width:28px">P${p.id}</span>
+        <div style="display:flex;gap:4px;flex:1;flex-wrap:wrap">
+          ${p.opts.map(o=>`<label style="display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;font-weight:700;color:var(--ink3)">
+            <span>${o.lbl}</span>
+            <input type="number" min="0" max="50" step="0.5" value="${o.pts}"
+              style="width:52px;font-size:13px;font-weight:700;text-align:center;border-radius:5px;border:1px solid var(--br);padding:2px 4px"
+              oninput="pxcSetOpt(${i},'${o.lbl}',this.value)"
+              autocomplete="off">
+          </label>`).join('')}
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <select onchange="pxcSetNivel(${i},this.value)"
+            style="font-size:11px;border-radius:5px;border:1px solid var(--br);padding:2px 5px;color:${nivelColor};font-weight:700">
+            <option value="0"${!p.nivel?' selected':''}>Auto</option>
+            ${NIVEL_LABELS.slice(1).map((l,n)=>`<option value="${n+1}"${p.nivel===(n+1)?' selected':''}>${l}</option>`).join('')}
+          </select>
+          <span style="font-size:11px;font-weight:700;color:${nivelColor};min-width:40px">
+            Máx: ${maxPts.toFixed(1)}
+          </span>
+        </div>
+      </div>
     </div>`;
   }).join('');
-  const el=document.getElementById('pxc-cfg-list');
-  el.innerHTML=
-    `<div style="font-size:11px;color:var(--ink3);margin-bottom:8px">Total: <strong>${totalPts.toFixed(1)} puntos</strong> · ${nq} preguntas · ${uniq.length} nivel${uniq.length!==1?'es':''}</div>`+
-    _pxcCfgPreguntas.map((p,i)=>`
-    <div class="pxc-cfg-row">
-      <span style="font-size:12px;color:var(--ink3);min-width:30px">P${p.id}</span>
-      <input type="number" min="0.5" max="50" step="0.5" value="${p.pts}"
-        style="width:70px;font-size:13px;font-weight:700;text-align:center;border-radius:var(--rs);border:1px solid var(--br);padding:3px 6px"
-        onchange="pxcSetPts(${i},this.value)" oninput="pxcSetPts(${i},this.value)" autocomplete="off">
-      <span style="font-size:11px;color:var(--ink3)">pt${p.pts===1?'':'s'}</span>
-    </div>`).join('')+
-    `<div style="margin-top:12px;padding-top:10px;border-top:2px solid var(--br)">
-      <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:6px">Etiquetas de nivel (editables)</div>
-      ${tierRows}
-    </div>`;
+}
+
+function pxcCalcTotal(){
+  return _pxcCfgPreguntas.reduce((s,p)=>s+Math.max(0,...p.opts.map(o=>o.pts)),0);
+}
+
+function pxcSetOpt(qIdx,lbl,val){
+  const n=Math.max(0,parseFloat(val)||0);
+  const p=_pxcCfgPreguntas[qIdx];
+  if(!p)return;
+  const opt=p.opts.find(o=>o.lbl===lbl);
+  if(opt)opt.pts=n;
+  // Update only total and max for this question (no full re-render to preserve focus)
+  const total=pxcCalcTotal();
+  const tEl=document.getElementById('pxc-total-display');
+  if(tEl)tEl.textContent=total.toFixed(1)+' pts';
+}
+
+function pxcSetNivel(qIdx,val){
+  const p=_pxcCfgPreguntas[qIdx];
+  if(p)p.nivel=parseInt(val)||null;
 }
 
 function pxcSetPts(idx,val){
-  const n=Math.max(0.5,parseFloat(val)||1);
-  if(_pxcCfgPreguntas[idx])_pxcCfgPreguntas[idx].pts=n;
-  // Update total display
-  const total=_pxcCfgPreguntas.reduce((s,p)=>s+p.pts,0);
-  const fst=document.getElementById('pxc-cfg-list')?.firstElementChild;
-  if(fst) fst.innerHTML=`Total: <strong>${total.toFixed(1)} puntos</strong> · ${_pxcCfgPreguntas.length} preguntas`;
+  // Legacy compat
+  const n=Math.max(0,parseFloat(val)||0);
+  if(_pxcCfgPreguntas[idx])_pxcCfgPreguntas[idx].opts[0].pts=n;
 }
 
 function pxcApplyDefault(){
-  const d=parseFloat(document.getElementById('pxc-defpts').value)||1;
-  pxcRenderCfgList();
-  _pxcCfgPreguntas.forEach(p=>p.pts=d);
-  pxcRenderCfgList();
+  // No-op en nueva versión (mantenido por compatibilidad)
 }
 
 function savePxcConfig(){
   const{cId,asig,per}=_pxc;
-  const nq=Math.min(100,Math.max(1,parseInt(document.getElementById('pxc-nq').value)||20));
+  const nq=Math.min(100,Math.max(1,parseInt(document.getElementById('pxc-nq').value)||10));
   _pxcCfgPreguntas=_pxcCfgPreguntas.slice(0,nq);
+  // Recalculate maxPts per question
+  _pxcCfgPreguntas.forEach(p=>{p.maxPts=Math.max(0,...p.opts.map(o=>o.pts));});
+  const total=pxcCalcTotal();
   const data=getGrD(cId,asig,per);
   pushUndo('Configurar PxC');
   data.pxcConfig={
-    preguntas:_pxcCfgPreguntas.map(p=>({id:p.id,pts:p.pts})),
-    total:_pxcCfgPreguntas.reduce((s,p)=>s+p.pts,0),
+    preguntas:_pxcCfgPreguntas.map(p=>({
+      id:p.id,
+      opts:p.opts.map(o=>({lbl:o.lbl,pts:o.pts})),
+      maxPts:p.maxPts,
+      nivel:p.nivel||null
+    })),
+    total,
     customLabels:Object.keys(_pxcCustomLabels).length?{..._pxcCustomLabels}:undefined
   };
   save();
   document.getElementById('pxc-cfg-ov').classList.remove('open');
   renderGrades();
-  toast('Configuración PxC guardada ✅ — ahora puedes calificar con 🎯','s');
+  toast('Configuración PxC guardada — ahora puedes calificar con 🎯','s');
 }
 
 // ── Grading ──
@@ -10752,15 +10799,22 @@ function openPxcGrade(cId,asig,per){
   if(!cfg){toast('Configura la prueba primero con 📝 Configurar PxC','e');return;}
   const co=getC(cId);
   document.getElementById('pxc-grade-title').textContent='🎯 PxC — '+(asig||'');
-  document.getElementById('pxc-grade-sub').textContent=co?(co.nombre+(co.grado?' · '+co.grado:'')):'';
+  document.getElementById('pxc-grade-sub').textContent=co?(co.nombre+(co.grado?' · '+co.grado:'')):' ';
   document.getElementById('pxc-grade-info').textContent=
-    cfg.preguntas.length+' preguntas · '+cfg.total.toFixed(1)+' pts totales · nota: (obt/'+cfg.total.toFixed(1)+')×4+1';
-  // Load existing responses into buffer
+    cfg.preguntas.length+' preguntas · '+cfg.total.toFixed(1)+' pts máx · nota: (obt/'+cfg.total.toFixed(1)+')×4+1';
   const studs=getStuDs(cId,per);
   _pxcBuf={};
   studs.forEach(st=>{
     const sc=(data.scores[st.id]||{})._pxc||{};
-    _pxcBuf[st.id]=new Set((sc.resp||[]).map(String)); // normalize to string
+    // New format: resp is object {qId: optLbl}
+    // Old format: resp is array of qIds (treat as 'A' selected)
+    if(sc.resp&&Array.isArray(sc.resp)){
+      // Legacy: migrate
+      const obj={};sc.resp.forEach(id=>{obj[String(id)]='A';});
+      _pxcBuf[st.id]=obj;
+    } else {
+      _pxcBuf[st.id]=sc.resp?{...sc.resp}:{};
+    }
   });
   renderPxcList();
   document.getElementById('pxc-grade-ov').classList.add('open');
@@ -10771,30 +10825,32 @@ function closePxcGrade(){
   _pxcBuf={};
 }
 
-// ── PxC tier mapping: assigns level 1-5 based on rank of unique point values ──
+// ── PxC level system ──
 const PXC_LEVELS=[
-  {t:'1',label:'Básico',    color:'#A8D5BA'},
-  {t:'2',label:'Intermedio',color:'#F9E79F'},
-  {t:'3',label:'Alto',      color:'#F5CBA7'},
-  {t:'4',label:'Avanzado',  color:'#F1948A'},
-  {t:'5',label:'Reto extra',color:'#7FB3D5'},
+  {t:'1',label:'Básico',    color:'#2E7D52',bg:'#A8D5BA',border:'#6DB88A'},
+  {t:'2',label:'Intermedio',color:'#7D6212',bg:'#F9E79F',border:'#D4B93A'},
+  {t:'3',label:'Alto',      color:'#7D4912',bg:'#F5CBA7',border:'#D49060'},
+  {t:'4',label:'Avanzado',  color:'#8B2D27',bg:'#F1948A',border:'#CC6B63'},
+  {t:'5',label:'Reto extra',color:'#1A5C82',bg:'#7FB3D5',border:'#4E8DB5'},
 ];
-function pxcGetTierMap(preguntas, customLabels){
-  // Sort unique point values ascending
-  const uniq=[...new Set(preguntas.map(p=>p.pts))].sort((a,b)=>a-b);
-  const n=uniq.length;
-  // Use 4 levels (Básico→Avanzado) unless >4 unique values → then add Reto extra (t=5)
-  const maxLvl=n>4?5:4;
-  const available=PXC_LEVELS.slice(0,maxLvl);
-  const map={};
-  uniq.forEach((v,i)=>{
-    const lvlIdx=n===1?0:Math.round(i/(n-1)*(maxLvl-1));
-    const base=available[lvlIdx];
-    // Allow custom label override (from config)
-    const label=customLabels?.[base.t]||base.label;
-    map[v]={...base,label};
-  });
-  return map;
+
+function pxcGetLevel(p, total){
+  if(p.nivel&&p.nivel>=1&&p.nivel<=5)return PXC_LEVELS[p.nivel-1];
+  // Auto-suggest based on maxPts weight
+  const weight=total>0?p.maxPts/total*100:0;
+  if(weight<=0)return PXC_LEVELS[0];
+  if(weight<20)return PXC_LEVELS[0];
+  if(weight<40)return PXC_LEVELS[1];
+  if(weight<65)return PXC_LEVELS[2];
+  return PXC_LEVELS[3];
+}
+
+function pxcMigrateQuestion(p){
+  // Migrate old format {id, pts} to new format
+  if(!p.opts){
+    return {id:p.id,opts:[{lbl:'A',pts:p.pts||0},{lbl:'B',pts:0},{lbl:'C',pts:0},{lbl:'D',pts:0}],maxPts:p.pts||0,nivel:null};
+  }
+  return p;
 }
 
 function renderPxcList(){
@@ -10803,190 +10859,123 @@ function renderPxcList(){
   const cfg=data.pxcConfig;
   const studs=getStuDs(cId,per);
   const el=document.getElementById('pxc-list');
-  const alphaEl=document.getElementById('pxc-alpha');
   if(!el||!cfg)return;
   _buildBankAlpha(studs,'pxc-alpha','pxc-list');
+
+  // Migrate questions if needed
+  const preguntas=cfg.preguntas.map(pxcMigrateQuestion);
+  const total=cfg.total;
+
   el.innerHTML=studs.map((st,i)=>{
-    const resp=_pxcBuf[st.id]||new Set();
-    const obt=cfg.preguntas.filter(p=>resp.has(String(p.id))).reduce((s,p)=>s+p.pts,0);
-    const nota=calcNota(obt,cfg.total);
-    const pct=cfg.total>0?Math.round(obt/cfg.total*100):0;
-    const allSelected=cfg.preguntas.every(p=>resp.has(String(p.id)));
+    const resp=_pxcBuf[st.id]||{};
+    // Calculate score
+    const obt=preguntas.reduce((s,p)=>{
+      const sel=resp[String(p.id)];
+      if(!sel)return s;
+      const opt=p.opts.find(o=>o.lbl===sel);
+      return s+(opt?opt.pts:0);
+    },0);
+    const nota=calcNota(obt,total);
+    const pct=total>0?Math.round(obt/total*100):0;
+
     return `<div class="bank-stu-row" data-stu-id="${st.id}" data-letter="${_stuLetter(st.nombre)}"
       style="border:1px solid var(--br);border-radius:var(--rs)">
       <div style="background:var(--sf);padding:8px 11px 5px;border-bottom:1px solid var(--br);border-radius:var(--rs) var(--rs) 0 0">
         <div style="display:flex;align-items:center;gap:6px">
           <span style="font-size:11px;color:var(--ink3);min-width:18px">${i+1}</span>
           <span style="flex:1;font-size:13px;font-weight:700;color:var(--ink)">${esc(st.nombre)}</span>
-          <button class="btn xs pxc-all-btn" id="pxca-${st.id}" onclick="pxcToggleAll('${st.id}')"
-            title="${allSelected?'Desmarcar todas':'Marcar todas correctas'}"
-            style="font-size:10px;padding:2px 7px">${allSelected?'✗ Ninguna':'✓ Todas'}</button>
-          <span style="font-size:11px;color:var(--ink3)">${obt.toFixed(1)}/${cfg.total.toFixed(1)}</span>
+          <span style="font-size:11px;color:var(--ink3)">${obt.toFixed(1)}/${total.toFixed(1)}</span>
           <span id="pxcn-${st.id}" class="pn ${nota!==null?notaCls(nota):'em'}" style="font-size:13px">${nota!==null?nota.toFixed(1):'—'}</span>
         </div>
         <div style="height:3px;background:var(--br);border-radius:2px;margin-top:5px;overflow:hidden">
           <div id="pxcb-${st.id}" style="height:100%;width:${pct}%;background:var(--ac);border-radius:2px"></div>
         </div>
       </div>
-      <div class="pxc-grid" style="padding:8px 11px">
-        ${(()=>{
-          const tierMap=pxcGetTierMap(cfg.preguntas,cfg.customLabels||{});
-          return cfg.preguntas.map(p=>{
-            const on=resp.has(String(p.id));
-            const lv=tierMap[p.pts]||PXC_LEVELS[0];
-            return `<button class="pxc-q${on?' on':''} pxc-t-${lv.t}"
-              onclick="pxcToggle('${st.id}',${p.id})"
-              title="P${p.id} · ${p.pts}pt${p.pts===1?'':'s'} · ${lv.label}">
-              <span style="font-size:12px;font-weight:700">${p.id}</span>
-              <span class="pxc-lbl">${lv.label}</span>
-            </button>`;
-          }).join('');
-        })()}
+      <div style="padding:8px 11px;display:flex;flex-direction:column;gap:5px">
+        ${preguntas.map(p=>{
+          const lv=pxcGetLevel(p,total);
+          const sel=resp[String(p.id)]||null;
+          return `<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+            <span style="font-size:11px;color:${lv.color};font-weight:700;min-width:22px">P${p.id}</span>
+            ${p.opts.map(o=>{
+              const isSel=sel===o.lbl;
+              const intensity=p.maxPts>0?o.pts/p.maxPts:0;
+              // Color with intensity
+              const bg=o.pts===0?'var(--sf2)':
+                `rgba(${hexToRgb(lv.bg)},${0.2+intensity*0.8})`;
+              const border=o.pts===0?'var(--br)':
+                `rgba(${hexToRgb(lv.border)},${0.3+intensity*0.7})`;
+              const color=o.pts===0?'var(--ink3)':lv.color;
+              return `<button onclick="pxcSelectOpt('${st.id}',${p.id},'${o.lbl}')"
+                style="min-width:36px;padding:3px 6px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;
+                border:2px solid ${isSel?lv.border:border};
+                background:${isSel?lv.bg:bg};
+                color:${isSel?lv.color:color};
+                box-shadow:${isSel?'0 0 0 2px '+lv.border:' none'};
+                transition:all .1s">
+                <div>${o.lbl}</div>
+                <div style="font-size:9px;font-weight:400">${o.pts>0?o.pts+'pt':''}</div>
+              </button>`;
+            }).join('')}
+            <button onclick="pxcSelectOpt('${st.id}',${p.id},null)"
+              style="min-width:36px;padding:3px 6px;border-radius:6px;cursor:pointer;font-size:10px;
+              border:2px solid ${!sel?'var(--ink3)':'var(--br)'};
+              background:${!sel?'var(--sf2)':'var(--sf)'};
+              color:var(--ink3);transition:all .1s">
+              —
+            </button>
+          </div>`;
+        }).join('')}
       </div>
     </div>`;
   }).join('');
 }
 
-function pxcToggle(stuId,qId){
-  qId=String(qId);
-  if(!_pxcBuf[stuId])_pxcBuf[stuId]=new Set();
-  const s=_pxcBuf[stuId];
-  s.has(qId)?s.delete(qId):s.add(qId);
-  _pxcUpdateRow(stuId); // single source of truth — syncs everything including button state
+function hexToRgb(hex){
+  const r=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return r?`${parseInt(r[1],16)},${parseInt(r[2],16)},${parseInt(r[3],16)}`:'128,128,128';
 }
 
-function pxcToggleAll(stuId){
-  const{cId,asig,per}=_pxc;
-  const data=getGrD(cId,asig,per);
-  const cfg=data.pxcConfig;
-  if(!_pxcBuf[stuId])_pxcBuf[stuId]=new Set();
-  // Read CURRENT state from Set — not from button text
-  const allNow=cfg.preguntas.every(p=>_pxcBuf[stuId].has(String(p.id)));
-  pxcSelectAll(stuId,!allNow); // invert
-}
-function pxcSelectAll(stuId,state){
-  const{cId,asig,per}=_pxc;
-  const data=getGrD(cId,asig,per);
-  const cfg=data.pxcConfig;
-  if(!_pxcBuf[stuId])_pxcBuf[stuId]=new Set();
-  const s=_pxcBuf[stuId];
-  if(state) cfg.preguntas.forEach(p=>s.add(String(p.id)));
-  else s.clear();
-  _pxcUpdateRow(stuId); // syncs all buttons from the Set
-}
-
-function _pxcUpdateRow(stuId){
-  const{cId,asig,per}=_pxc;
-  const data=getGrD(cId,asig,per);
-  const cfg=data.pxcConfig;
-  const resp=_pxcBuf[stuId]||new Set();
-  const obt=cfg.preguntas.filter(p=>resp.has(String(p.id))).reduce((s,p)=>s+p.pts,0);
+function pxcSelectOpt(stuId,qId,optLbl){
+  if(!_pxcBuf[stuId])_pxcBuf[stuId]={};
+  const key=String(qId);
+  if(optLbl===null){delete _pxcBuf[stuId][key];}
+  else{_pxcBuf[stuId][key]=optLbl;}
+  // Actualizar score y barra de progreso sin re-render completo
+  const cfg=getGrD(_pxc.cId,_pxc.asig,_pxc.per).pxcConfig;
+  if(!cfg)return;
+  const preguntas=cfg.preguntas.map(pxcMigrateQuestion);
+  const resp=_pxcBuf[stuId];
+  const obt=preguntas.reduce((s,p)=>{
+    const sel=resp[String(p.id)];
+    if(!sel)return s;
+    const opt=p.opts.find(o=>o.lbl===sel);
+    return s+(opt?opt.pts:0);
+  },0);
   const nota=calcNota(obt,cfg.total);
   const pct=cfg.total>0?Math.round(obt/cfg.total*100):0;
-  const allSelected=cfg.preguntas.every(p=>resp.has(String(p.id)));
-  // Update nota badge
-  const notaEl=document.getElementById('pxcn-'+stuId);
-  if(notaEl){notaEl.textContent=nota!==null?nota.toFixed(1):'—';notaEl.className='pn '+(nota!==null?notaCls(nota):'em');}
-  // Update progress bar
-  const bar=document.getElementById('pxcb-'+stuId);
-  if(bar)bar.style.width=pct+'%';
-  const row=document.querySelector('#pxc-list [data-stu-id="'+stuId+'"]');
-  if(row){
-    // Update pts label
-    const ptsSpan=row.querySelector('[style*="font-size:11px;color:var(--ink3)"]');
-    if(ptsSpan)ptsSpan.textContent=obt.toFixed(1)+'/'+cfg.total.toFixed(1);
-    // Update select-all button
-    const allBtn=document.getElementById('pxca-'+stuId);
-    if(allBtn){
-      allBtn.textContent=allSelected?'✗ Ninguna':'✓ Todas';
-      allBtn.className='btn xs pxc-all-btn'+(allSelected?' danger':'');
-    }
-    // *** Sync every question button's .on class from the Set ***
-    const tierMap=pxcGetTierMap(cfg.preguntas,cfg.customLabels||{});
-    row.querySelectorAll('.pxc-q').forEach(btn=>{
-      const onclick=btn.getAttribute('onclick')||'';
-      const m=onclick.match(/pxcToggle\([^,]+,(\d+)\)/);
-      if(!m)return;
-      const qId=m[1];
-      btn.classList.toggle('on', resp.has(String(qId)));
-      const pq=cfg.preguntas.find(p=>String(p.id)===qId);
-      if(pq){
-        const lv=tierMap[pq.pts]||PXC_LEVELS[0];
-        btn.classList.remove('pxc-t-1','pxc-t-2','pxc-t-3','pxc-t-4','pxc-t-5');
-        btn.classList.add('pxc-t-'+lv.t);
-      }
-    });
-  }
-}
-
-// ── Copy PxC to other courses ──
-function openPxcCopy(){
-  const{cId,asig,per}=_pxc;
-  const list=document.getElementById('pxc-copy-list');
-  if(!list)return;
-  // Show all other courses that have the same asig
-  const otherCourses=courses.filter(co=>co.id!==cId&&(getGrD(co.id,asig,per)||{}).activities!==undefined);
-  if(!otherCourses.length){
-    list.innerHTML='<div style="font-size:13px;color:var(--ink3);padding:8px">No hay otros cursos con la asignatura "'+esc(asig)+'" disponibles.</div>';
-  } else {
-    list.innerHTML=otherCourses.map(co=>`
-      <label style="display:flex;align-items:center;gap:10px;padding:6px 4px;cursor:pointer;font-size:13px">
-        <input type="checkbox" value="${co.id}" style="width:16px;height:16px">
-        <span><strong>${esc(co.nombre)}</strong>${co.grado?' · '+esc(co.grado):''}</span>
-        ${getGrD(co.id,asig,per).pxcConfig?'<span style="font-size:10px;color:var(--am)">⚠️ ya tiene PxC</span>':''}
-      </label>`).join('');
-  }
-  document.getElementById('pxc-copy-ov').classList.add('open');
-}
-
-function executePxcCopy(){
-  const{cId,asig,per}=_pxc;
-  const srcData=getGrD(cId,asig,per);
-  if(!srcData.pxcConfig){toast('Guarda la configuración primero','e');return;}
-  const checks=[...document.querySelectorAll('#pxc-copy-list input[type=checkbox]:checked')];
-  if(!checks.length){toast('Selecciona al menos un curso','e');return;}
-  pushUndo('Copiar PxC a '+checks.length+' curso(s)');
-  let count=0;
-  checks.forEach(cb=>{
-    const destData=getGrD(cb.value,asig,per);
-    // Copy config
-    destData.pxcConfig=JSON.parse(JSON.stringify(srcData.pxcConfig));
-    // Create the PxC activity in dest if not exists
-    const PXC_ACT_NAME='Prueba por Competencias (PxC)';
-    if(!destData.activities.find(a=>a.pxcAuto)){
-      destData.activities.push({
-        id:uid(),name:PXC_ACT_NAME,pilar:'pxc',
-        posibles:srcData.pxcConfig.total,
-        desc:'Nota calculada automáticamente desde las respuestas de la Prueba por Competencias.',
-        pxcAuto:true,auto:false
-      });
-    }
-    count++;
-  });
-  save();
-  document.getElementById('pxc-copy-ov').classList.remove('open');
-  toast('PxC copiada a '+count+' curso'+(count!==1?'s':'')+' ✅ — lista para calificar','s');
-}
-
-function pxcMarkAll(state){
-  const{cId,asig,per}=_pxc;
-  const data=getGrD(cId,asig,per);
-  const cfg=data.pxcConfig;
-  const studs=getStuDs(cId,per);
-  studs.forEach(st=>{
-    _pxcBuf[st.id]=state?new Set(cfg.preguntas.map(p=>p.id)):new Set();
-  });
+  const nEl=document.getElementById('pxcn-'+stuId);
+  const bEl=document.getElementById('pxcb-'+stuId);
+  if(nEl){nEl.textContent=nota!==null?nota.toFixed(1):'—';nEl.className='pn '+(nota!==null?notaCls(nota):'em');}
+  if(bEl)bEl.style.width=pct+'%';
+  // Re-render solo este estudiante para actualizar selección visual
   renderPxcList();
 }
+
+function pxcToggle(stuId,qId){
+  // Legacy — redirect to new system
+  pxcSelectOpt(stuId,qId,'A');
+}
+function pxcToggleAll(stuId){}
 
 function savePxcGrades(){
   const{cId,asig,per}=_pxc;
   const data=getGrD(cId,asig,per);
   const cfg=data.pxcConfig;
   if(!cfg)return;
+  const preguntas=cfg.preguntas.map(pxcMigrateQuestion);
   const studs=getStuDs(cId,per);
   pushUndo('Guardar notas PxC');
-  // Ensure PxC activity exists
   const PXC_ACT_NAME='Prueba por Competencias (PxC)';
   let act=data.activities.find(a=>a.pilar==='pxc'&&a.pxcAuto);
   if(!act){
@@ -10998,12 +10987,15 @@ function savePxcGrades(){
     act.posibles=cfg.total;
   }
   studs.forEach(st=>{
-    const resp=_pxcBuf[st.id]||new Set();
-    const obt=cfg.preguntas.filter(p=>resp.has(String(p.id))).reduce((s,p)=>s+p.pts,0);
+    const resp=_pxcBuf[st.id]||{};
+    const obt=preguntas.reduce((s,p)=>{
+      const sel=resp[String(p.id)];
+      if(!sel)return s;
+      const opt=p.opts.find(o=>o.lbl===sel);
+      return s+(opt?opt.pts:0);
+    },0);
     if(!data.scores[st.id])data.scores[st.id]={};
-    // Save raw responses for future editing
-    data.scores[st.id]._pxc={resp:[...resp].map(String),obt,pos:cfg.total};
-    // Respect posFixed — don't overwrite a custom pos the teacher set
+    data.scores[st.id]._pxc={resp:{...resp},obt,pos:cfg.total};
     const prev=data.scores[st.id][act.id]||{};
     const posToUse=prev.posFixed?prev.pos:cfg.total;
     data.scores[st.id][act.id]={...prev,obt,pos:posToUse,...(prev.posFixed?{posFixed:true}:{})};
