@@ -10686,7 +10686,6 @@ function pxcSetLabel(tierT,val){
 
 function pxcRenderCfgList(){
   const nq=Math.min(100,Math.max(1,parseInt(document.getElementById('pxc-nq')?.value)||10));
-  // Sync array length
   while(_pxcCfgPreguntas.length<nq){
     const id=_pxcCfgPreguntas.length+1;
     _pxcCfgPreguntas.push({id,opts:[{lbl:'A',pts:0},{lbl:'B',pts:0},{lbl:'C',pts:0},{lbl:'D',pts:0}],nivel:null});
@@ -10697,43 +10696,48 @@ function pxcRenderCfgList(){
   const tEl=document.getElementById('pxc-total-display');
   if(tEl)tEl.textContent=total.toFixed(1)+' pts';
 
-  const NIVEL_LABELS=['','Básico','Intermedio','Alto','Avanzado'];
-  const NIVEL_COLORS=['','#2E7D52','#7D6212','#7D4912','#8B2D27'];
-
   const el=document.getElementById('pxc-cfg-list');
   if(!el)return;
-  el.innerHTML=_pxcCfgPreguntas.map((p,i)=>{
-    const maxPts=Math.max(...p.opts.map(o=>o.pts));
-    // Auto-suggest nivel based on weight
+
+  const thS='padding:7px 10px;background:var(--sf2);border:1px solid var(--br);font-size:11px;font-weight:700;color:var(--ink2);text-align:center;white-space:nowrap;position:sticky;top:0;z-index:1';
+  const tdS='padding:5px 7px;border:1px solid var(--br);text-align:center;vertical-align:middle';
+  const inpS='width:56px;font-size:14px;font-weight:700;text-align:center;border:1px solid var(--br);border-radius:5px;padding:3px 4px;background:var(--sf)';
+  const NIVEL_COLORS=['','#2E7D52','#7D6212','#7D4912','#8B2D27','#1A5C82'];
+  const NIVEL_LABELS=['','Básico','Intermedio','Alto','Avanzado','Reto'];
+
+  let html2='<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>';
+  html2+=`<th style="${thS};min-width:36px">P#</th>`;
+  ['A','B','C','D'].forEach(l=>{html2+=`<th style="${thS}">Opción ${l}</th>`;});
+  html2+=`<th style="${thS};min-width:100px">Nivel</th>`;
+  html2+=`<th style="${thS}">Máx pts</th>`;
+  html2+='</tr></thead><tbody>';
+
+  _pxcCfgPreguntas.forEach((p,i)=>{
+    const maxPts=Math.max(0,...p.opts.map(o=>o.pts));
     const weight=total>0?maxPts/total*100:0;
     const autoNivel=weight<=0?0:weight<20?1:weight<40?2:weight<65?3:4;
     const nivelEff=p.nivel||autoNivel;
-    const nivelColor=NIVEL_COLORS[nivelEff]||'#999';
-    return `<div style="border:1px solid var(--br);border-radius:var(--rs);overflow:hidden">
-      <div style="background:var(--sf);padding:6px 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <span style="font-size:12px;font-weight:700;color:var(--ink2);min-width:28px">P${p.id}</span>
-        <div style="display:flex;gap:4px;flex:1;flex-wrap:wrap">
-          ${p.opts.map(o=>`<label style="display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;font-weight:700;color:var(--ink3)">
-            <span>${o.lbl}</span>
-            <input type="number" min="0" max="50" step="0.5" value="${o.pts}"
-              style="width:52px;font-size:13px;font-weight:700;text-align:center;border-radius:5px;border:1px solid var(--br);padding:2px 4px"
-              oninput="pxcSetOpt(${i},'${o.lbl}',this.value)"
-              autocomplete="off">
-          </label>`).join('')}
-        </div>
-        <div style="display:flex;align-items:center;gap:6px">
-          <select onchange="pxcSetNivel(${i},this.value)"
-            style="font-size:11px;border-radius:5px;border:1px solid var(--br);padding:2px 5px;color:${nivelColor};font-weight:700">
-            <option value="0"${!p.nivel?' selected':''}>Auto</option>
-            ${NIVEL_LABELS.slice(1).map((l,n)=>`<option value="${n+1}"${p.nivel===(n+1)?' selected':''}>${l}</option>`).join('')}
-          </select>
-          <span style="font-size:11px;font-weight:700;color:${nivelColor};min-width:40px">
-            Máx: ${maxPts.toFixed(1)}
-          </span>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
+    const nc=NIVEL_COLORS[nivelEff]||'var(--ink3)';
+    html2+=`<tr>`;
+    html2+=`<td style="${tdS};font-weight:700;color:var(--ink2)">P${p.id}</td>`;
+    p.opts.forEach(o=>{
+      html2+=`<td style="${tdS}"><input type="number" min="0" max="50" step="0.5" value="${o.pts}"
+        style="${inpS}" autocomplete="off"
+        oninput="pxcSetOpt(${i},'${o.lbl}',this.value)"></td>`;
+    });
+    html2+=`<td style="${tdS}"><select onchange="pxcSetNivel(${i},this.value)"
+      style="font-size:12px;border:1px solid var(--br);border-radius:5px;padding:3px 6px;color:${nc};font-weight:700;background:var(--sf);width:100%">
+      <option value="0"${!p.nivel?' selected':''}>Auto</option>`;
+    NIVEL_LABELS.slice(1).forEach((l,n)=>{
+      html2+=`<option value="${n+1}"${p.nivel===(n+1)?' selected':''}>${l}</option>`;
+    });
+    html2+=`</select></td>`;
+    html2+=`<td id="pxc-max-${i}" style="${tdS};font-weight:700;color:${nc}">${maxPts.toFixed(1)}</td>`;
+    html2+=`</tr>`;
+  });
+
+  html2+='</tbody></table>';
+  el.innerHTML=html2;
 }
 
 function pxcCalcTotal(){
@@ -10746,10 +10750,13 @@ function pxcSetOpt(qIdx,lbl,val){
   if(!p)return;
   const opt=p.opts.find(o=>o.lbl===lbl);
   if(opt)opt.pts=n;
-  // Update only total and max for this question (no full re-render to preserve focus)
+  p.maxPts=Math.max(0,...p.opts.map(o=>o.pts));
   const total=pxcCalcTotal();
   const tEl=document.getElementById('pxc-total-display');
   if(tEl)tEl.textContent=total.toFixed(1)+' pts';
+  // Actualizar solo la celda Máx de esta pregunta
+  const mEl=document.getElementById('pxc-max-'+qIdx);
+  if(mEl)mEl.textContent=p.maxPts.toFixed(1);
 }
 
 function pxcSetNivel(qIdx,val){
