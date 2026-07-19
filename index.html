@@ -853,163 +853,6 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
   </div>
 </div>
 
-<div class="wiz-ov" id="onboard-ov" style="display:none">
-  <div class="wiz-box" style="max-width:540px">
-
-    <!-- Step 1: Welcome -->
-    <div id="ob-step-1">
-      <div class="wiz-prog"><div class="wiz-bar" style="width:33%"></div></div>
-      <div class="wiz-hdr">
-        <div style="font-size:48px;margin-bottom:10px">📓</div>
-        <div style="font-family:'Libre Baskerville',serif;font-size:22px;font-weight:700;color:var(--ink);margin-bottom:6px">Bitácora Docente 2026</div>
-        <div style="font-size:13px;color:var(--ink3)">Su asistente de gestión pedagógica</div>
-      </div>
-      <div style="padding:0 28px 20px">
-        <div style="font-size:14px;color:var(--ink2);line-height:1.8;margin-bottom:16px">
-          <strong>Bitácora Docente</strong> es una herramienta diseñada para acompañar la labor del educador en su día a día, centralizando en un solo lugar:
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-          <div style="background:var(--sf2);border-radius:var(--rs);padding:12px;font-size:13px;color:var(--ink2)">📋 <strong>Bitácora</strong> de clases y registros pedagógicos</div>
-          <div style="background:var(--sf2);border-radius:var(--rs);padding:12px;font-size:13px;color:var(--ink2)">✅ <strong>Asistencia</strong> con estadísticas automáticas</div>
-          <div style="background:var(--sf2);border-radius:var(--rs);padding:12px;font-size:13px;color:var(--ink2)">📊 <strong>Calificaciones</strong> por pilares de desempeño</div>
-          <div style="background:var(--sf2);border-radius:var(--rs);padding:12px;font-size:13px;color:var(--ink2)">📝 <strong>Seguimiento</strong> personalizado a cada estudiante</div>
-          <div style="background:var(--sf2);border-radius:var(--rs);padding:12px;font-size:13px;color:var(--ink2)">📉 <strong>Reportes</strong> de corte preventivo y progreso anual</div>
-          <div style="background:var(--sf2);border-radius:var(--rs);padding:12px;font-size:13px;color:var(--ink2)">☁️ <strong>Sincronización</strong> PC ↔ Tablet en tiempo real</div>
-        </div>
-        <div style="font-size:12px;color:var(--ink3);text-align:center">Sus datos se guardan localmente en su dispositivo y opcionalmente en la nube.</div>
-      </div>
-      <div class="wiz-foot"><button class="btn primary" onclick="obStep(2)">Continuar →</button></div>
-    </div>
-
-    <!-- Step 2: Legal disclaimer -->
-    <div id="ob-step-2" style="display:none">
-      <div class="wiz-prog"><div class="wiz-bar" style="width:66%"></div></div>
-      <div class="wiz-hdr">
-        <div style="font-size:36px;margin-bottom:8px">⚖️</div>
-        <div style="font-family:'Libre Baskerville',serif;font-size:18px;font-weight:700;color:var(--ink)">Descargo de responsabilidades</div>
-      </div>
-      <div style="padding:0 28px 20px;font-size:13px;color:var(--ink2);line-height:1.8;max-height:320px;overflow-y:auto">
-        <p><strong>Bitácora Docente 2026</strong> es una herramienta de apoyo a la gestión pedagógica de uso personal. Al utilizarla, usted acepta las siguientes condiciones:</p>
-        <p><strong>1. Responsabilidad de los datos.</strong> Todos los datos ingresados (notas, asistencias, observaciones, información de estudiantes) son de exclusiva responsabilidad del usuario. La aplicación no valida ni certifica la exactitud de la información registrada.</p>
-        <p><strong>2. Protección de datos personales.</strong> El usuario es responsable de garantizar que el uso de esta herramienta cumple con la normativa de protección de datos personales vigente en su país (en Colombia, Ley 1581 de 2012). Los datos de estudiantes son sensibles y deben manejarse con la debida confidencialidad.</p>
-        <p><strong>3. Almacenamiento.</strong> Los datos se almacenan en el dispositivo del usuario mediante localStorage del navegador. La sincronización en la nube es una funcionalidad opcional incluida en la licencia.</p>
-        <p><strong>4. Sin garantía.</strong> Esta herramienta se ofrece tal como está, sin garantías de ningún tipo. El desarrollador no se hace responsable por pérdida de datos derivada de fallos del dispositivo, del navegador o de la conexión.</p>
-        <p><strong>5. Uso oficial.</strong> Esta aplicación no reemplaza los sistemas oficiales de registro académico de su institución. Es una herramienta de apoyo personal al docente.</p>
-        <div style="margin-top:14px;padding:12px;background:var(--aml);border-radius:var(--rs);color:var(--am);font-size:12px">
-          Al continuar, usted declara haber leído y aceptado estas condiciones.
-        </div>
-      </div>
-      <div class="wiz-foot">
-        <button class="btn" onclick="obStep(1)">← Volver</button>
-        <button class="btn primary" onclick="obStep(3)">Acepto y continúo →</button>
-      </div>
-    </div>
-
-    <!-- Step 3: Device selection -->
-    <div id="ob-step-3" style="display:none">
-      <div class="wiz-prog"><div class="wiz-bar" style="width:100%"></div></div>
-      <div class="wiz-hdr">
-        <div style="font-size:36px;margin-bottom:8px">📱</div>
-        <div style="font-family:'Libre Baskerville',serif;font-size:18px;font-weight:700;color:var(--ink);margin-bottom:6px">¿Dónde va a usar la aplicación?</div>
-        <div style="font-size:13px;color:var(--ink3)">Esto define cómo configuramos la app por primera vez</div>
-      </div>
-      <div style="padding:0 28px 24px;display:flex;flex-direction:column;gap:14px">
-        <button onclick="obSelectDevice('pc')" style="display:flex;align-items:flex-start;gap:14px;padding:16px;border:2px solid var(--ac);border-radius:var(--r);background:rgba(45,91,227,.05);cursor:pointer;text-align:left;width:100%">
-          <span style="font-size:32px;flex-shrink:0">🖥️</span>
-          <div>
-            <div style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:3px">Computador <span style="font-size:11px;background:var(--ac);color:#fff;padding:1px 8px;border-radius:8px;font-weight:600;vertical-align:middle">Recomendado para empezar</span></div>
-            <div style="font-size:12px;color:var(--ink3);line-height:1.6">Configure sus datos, cursos y conexión a la nube. Desde el PC gestiona toda la información y la Tablet la consulta sincronizada.</div>
-          </div>
-        </button>
-        <button onclick="obSelectDevice('tablet')" style="display:flex;align-items:flex-start;gap:14px;padding:16px;border:2px solid var(--br);border-radius:var(--r);background:var(--sf);cursor:pointer;text-align:left;width:100%">
-          <span style="font-size:32px;flex-shrink:0">📱</span>
-          <div>
-            <div style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:3px">Tablet</div>
-            <div style="font-size:12px;color:var(--ink3);line-height:1.6">Ya configuró la app en el computador. Ingrese la URL de conexión para cargar todos sus datos desde la nube automáticamente.</div>
-          </div>
-        </button>
-      </div>
-      <div class="wiz-foot"><button class="btn" onclick="obStep(2)">← Volver</button></div>
-    </div>
-
-    <!-- Step 4b: Tablet sync -->
-    <div id="ob-step-tablet" style="display:none">
-      <div class="wiz-prog"><div class="wiz-bar" style="width:100%;background:var(--ac)"></div></div>
-      <div class="wiz-hdr">
-        <div style="font-size:36px;margin-bottom:8px">☁️</div>
-        <div style="font-family:'Libre Baskerville',serif;font-size:18px;font-weight:700;color:var(--ink);margin-bottom:6px">Conectar con la nube</div>
-        <div style="font-size:13px;color:var(--ink3)">Ingrese la URL configurada en su computador</div>
-      </div>
-      <div style="padding:0 28px 24px">
-        <div style="font-size:13px;color:var(--ink2);line-height:1.7;margin-bottom:16px;background:var(--sf2);border-radius:var(--rs);padding:12px 14px">
-          Ingresa la <strong>URL de sincronización</strong> que recibiste al adquirir tu licencia. Si aún no la tienes, contacta a <strong>Nanjo Projects</strong> (nanjoprojects@gmail.com).
-        </div>
-        <div class="fg" style="margin-bottom:18px">
-          <label>URL de sincronización</label>
-          <input id="ob-tablet-url" type="url" placeholder="https://script.google.com/macros/s/..." style="font-size:13px">
-        </div>
-        <div id="ob-tablet-status" style="font-size:13px;color:var(--ink3);min-height:22px;text-align:center"></div>
-      </div>
-      <div class="wiz-foot">
-        <button class="btn" onclick="obStep(3)">← Volver</button>
-        <button class="btn primary" id="ob-tablet-btn" onclick="obTabletConnect()">☁️ Conectar y cargar datos</button>
-      </div>
-    </div>
-
-    <!-- Step 4c: PIN setup (PC flow) -->
-    <div id="ob-step-pin" style="display:none">
-      <div class="wiz-prog"><div class="wiz-bar" style="width:100%;background:var(--gr)"></div></div>
-      <div class="wiz-hdr">
-        <div style="font-size:36px;margin-bottom:8px">🔐</div>
-        <div style="font-family:'Libre Baskerville',serif;font-size:18px;font-weight:700;color:var(--ink);margin-bottom:4px">Configura tu PIN de acceso</div>
-        <div style="font-size:13px;color:var(--ink3)" id="ob-pin-subtitle">Elige un PIN de 4 a 6 dígitos para proteger tus datos</div>
-      </div>
-      <div style="padding:0 28px 24px">
-        <div class="pin-dots" id="ob-pin-dots">
-          <div class="pin-dot" id="opd0"></div>
-          <div class="pin-dot" id="opd1"></div>
-          <div class="pin-dot" id="opd2"></div>
-          <div class="pin-dot" id="opd3"></div>
-          <div class="pin-dot" id="opd4"></div>
-          <div class="pin-dot" id="opd5"></div>
-        </div>
-        <div class="pin-pad">
-          <button class="pin-btn" onclick="obPinKey('1')">1</button>
-          <button class="pin-btn" onclick="obPinKey('2')">2</button>
-          <button class="pin-btn" onclick="obPinKey('3')">3</button>
-          <button class="pin-btn" onclick="obPinKey('4')">4</button>
-          <button class="pin-btn" onclick="obPinKey('5')">5</button>
-          <button class="pin-btn" onclick="obPinKey('6')">6</button>
-          <button class="pin-btn" onclick="obPinKey('7')">7</button>
-          <button class="pin-btn" onclick="obPinKey('8')">8</button>
-          <button class="pin-btn" onclick="obPinKey('9')">9</button>
-          <button class="pin-btn" style="opacity:.3;cursor:default">·</button>
-          <button class="pin-btn" onclick="obPinKey('0')">0</button>
-          <button class="pin-btn" onclick="obPinDel()">⌫</button>
-        </div>
-        <div style="text-align:center;margin-top:14px;font-size:12px;color:var(--ink3)" id="ob-pin-msg"></div>
-        <button class="btn primary sm" onclick="obPinConfirmStep()" style="display:block;margin:10px auto 0">✓ Confirmar</button>
-        <button class="btn sm" onclick="obSkipPin()" style="display:block;margin:8px auto 0;color:var(--ink3)">Omitir por ahora (no recomendado)</button>
-      </div>
-    </div>
-
-  </div>
-</div>
-<div class="wiz-ov" id="wizard" style="display:none">
-  <div class="wiz-box">
-    <div class="wiz-prog"><div class="wiz-bar" id="wbar" style="width:33%"></div></div>
-    <div class="wiz-hdr">
-      <div class="wiz-step" id="wstep">Paso 1 de 3</div>
-      <div class="wiz-title" id="wtitle">¡Bienvenido!</div>
-      <div class="wiz-sub" id="wsub">Configuremos tu bitácora.</div>
-    </div>
-    <div class="wiz-body" id="wbody"></div>
-    <div class="wiz-foot">
-      <button class="btn" id="wback" onclick="wPrev()" style="display:none">← Atrás</button>
-      <button class="btn primary" id="wnext" onclick="wNext()">Siguiente →</button>
-    </div>
-  </div>
-</div>
 
 <!-- TOPBAR -->
 <div class="topbar">
@@ -2179,6 +2022,127 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
 
 <input type="file" id="import-file" accept=".json" style="display:none" onchange="doImport(this)">
 <div class="toast-c" id="toast-c"></div>
+<!-- ════════ BIENVENIDA + DESCARGO DE RESPONSABILIDADES ════════ -->
+<div id="welcome-legal-ov" style="display:none;position:fixed;inset:0;z-index:9999;overflow:hidden">
+
+  <!-- PANTALLA 1: BIENVENIDA -->
+  <div id="wl-p1" style="position:absolute;inset:0;background:linear-gradient(145deg,#0F172A 0%,#1E293B 50%,#0F2044 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;overflow-y:auto">
+
+    <!-- Logo Arit-os -->
+    <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:32px">
+      <div style="width:80px;height:80px;background:linear-gradient(135deg,#3B82F6,#6366F1);border-radius:20px;display:flex;align-items:center;justify-content:center;box-shadow:0 20px 60px rgba(99,102,241,.4);margin-bottom:14px">
+        <span style="font-size:42px">📓</span>
+      </div>
+      <div style="font-family:'Libre Baskerville',serif;font-size:11px;font-weight:700;letter-spacing:.35em;color:#6366F1;text-transform:uppercase;margin-bottom:4px">Arit-os · Tecnología Educativa</div>
+    </div>
+
+    <!-- Título -->
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-family:'Libre Baskerville',serif;font-size:28px;font-weight:700;color:#F8FAFC;line-height:1.2;margin-bottom:8px">Bitácora Docente<br><span style="color:#6366F1">2026</span></div>
+      <div style="font-size:14px;color:#94A3B8;line-height:1.6">Su asistente de gestión pedagógica integral</div>
+    </div>
+
+    <!-- Grid de características -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:420px;width:100%;margin-bottom:32px">
+      <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:22px">📋</span>
+        <div><div style="font-size:12px;font-weight:700;color:#F1F5F9">Bitácora</div><div style="font-size:11px;color:#64748B">Registro pedagógico</div></div>
+      </div>
+      <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:22px">✅</span>
+        <div><div style="font-size:12px;font-weight:700;color:#F1F5F9">Asistencia</div><div style="font-size:11px;color:#64748B">Con estadísticas</div></div>
+      </div>
+      <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:22px">📊</span>
+        <div><div style="font-size:12px;font-weight:700;color:#F1F5F9">Calificaciones</div><div style="font-size:11px;color:#64748B">Por competencias</div></div>
+      </div>
+      <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:22px">📝</span>
+        <div><div style="font-size:12px;font-weight:700;color:#F1F5F9">Seguimiento</div><div style="font-size:11px;color:#64748B">Personalizado</div></div>
+      </div>
+      <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:22px">📉</span>
+        <div><div style="font-size:12px;font-weight:700;color:#F1F5F9">Reportes</div><div style="font-size:11px;color:#64748B">Corte y progreso</div></div>
+      </div>
+      <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:22px">☁️</span>
+        <div><div style="font-size:12px;font-weight:700;color:#F1F5F9">Sincronización</div><div style="font-size:11px;color:#64748B">PC ↔ Tablet</div></div>
+      </div>
+    </div>
+
+    <!-- Botón continuar -->
+    <button onclick="wlGoToLegal()" style="background:linear-gradient(135deg,#3B82F6,#6366F1);color:#fff;border:none;border-radius:14px;padding:16px 48px;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 8px 32px rgba(99,102,241,.4);letter-spacing:.02em;transition:transform .1s,box-shadow .1s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+      Comenzar →
+    </button>
+
+    <!-- Footer -->
+    <div style="margin-top:24px;font-size:11px;color:#334155;text-align:center">
+      © 2026 Nanjo Projects · nanjoprojects@gmail.com
+    </div>
+  </div>
+
+  <!-- PANTALLA 2: DESCARGO DE RESPONSABILIDADES -->
+  <div id="wl-p2" style="position:absolute;inset:0;background:var(--sf);display:none;flex-direction:column">
+
+    <!-- Header fijo -->
+    <div style="background:var(--ink);padding:20px 24px 16px;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
+        <div style="width:36px;height:36px;background:linear-gradient(135deg,#3B82F6,#6366F1);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">⚖️</div>
+        <div>
+          <div style="font-family:'Libre Baskerville',serif;font-size:18px;font-weight:700;color:#F8FAFC">Descargo de Responsabilidades</div>
+          <div style="font-size:11px;color:#64748B;margin-top:1px">Lea atentamente antes de continuar</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contenido con scroll -->
+    <div style="flex:1;overflow-y:auto;padding:24px;min-height:0">
+      <div style="max-width:640px;margin:0 auto">
+
+        <div style="background:var(--aml);border-left:3px solid var(--am);border-radius:0 var(--rs) var(--rs) 0;padding:12px 16px;margin-bottom:20px;font-size:13px;color:var(--ink2);line-height:1.7">
+          <strong>Bitácora Docente 2026</strong> es una herramienta de apoyo a la gestión pedagógica de uso personal. Al continuar, usted acepta las siguientes condiciones:
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="background:var(--sf2);border-radius:var(--rs);padding:16px 18px;border:1px solid var(--br)">
+            <div style="font-weight:700;font-size:13px;color:var(--ink);margin-bottom:6px;display:flex;align-items:center;gap:8px"><span style="background:var(--ac);color:#fff;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0">1</span> Responsabilidad de los datos</div>
+            <div style="font-size:13px;color:var(--ink2);line-height:1.7">Todos los datos ingresados (notas, asistencias, observaciones, información de estudiantes) son de exclusiva responsabilidad del usuario. La aplicación no valida ni certifica la exactitud de la información registrada.</div>
+          </div>
+          <div style="background:var(--sf2);border-radius:var(--rs);padding:16px 18px;border:1px solid var(--br)">
+            <div style="font-weight:700;font-size:13px;color:var(--ink);margin-bottom:6px;display:flex;align-items:center;gap:8px"><span style="background:var(--ac);color:#fff;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0">2</span> Protección de datos personales</div>
+            <div style="font-size:13px;color:var(--ink2);line-height:1.7">El usuario es responsable de garantizar que el uso de esta herramienta cumple con la normativa de protección de datos personales vigente en su país (en Colombia, <strong>Ley 1581 de 2012</strong>). Los datos de estudiantes son sensibles y deben manejarse con la debida confidencialidad.</div>
+          </div>
+          <div style="background:var(--sf2);border-radius:var(--rs);padding:16px 18px;border:1px solid var(--br)">
+            <div style="font-weight:700;font-size:13px;color:var(--ink);margin-bottom:6px;display:flex;align-items:center;gap:8px"><span style="background:var(--ac);color:#fff;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0">3</span> Almacenamiento</div>
+            <div style="font-size:13px;color:var(--ink2);line-height:1.7">Los datos se almacenan en el dispositivo del usuario mediante localStorage del navegador y opcionalmente en Google Drive. La sincronización en la nube es una funcionalidad incluida en la licencia activa.</div>
+          </div>
+          <div style="background:var(--sf2);border-radius:var(--rs);padding:16px 18px;border:1px solid var(--br)">
+            <div style="font-weight:700;font-size:13px;color:var(--ink);margin-bottom:6px;display:flex;align-items:center;gap:8px"><span style="background:var(--ac);color:#fff;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0">4</span> Sin garantía</div>
+            <div style="font-size:13px;color:var(--ink2);line-height:1.7">Esta herramienta se ofrece tal como está, sin garantías de ningún tipo. El desarrollador no se hace responsable por pérdida de datos derivada de fallos del dispositivo, del navegador o de la conexión a internet.</div>
+          </div>
+          <div style="background:var(--sf2);border-radius:var(--rs);padding:16px 18px;border:1px solid var(--br)">
+            <div style="font-weight:700;font-size:13px;color:var(--ink);margin-bottom:6px;display:flex;align-items:center;gap:8px"><span style="background:var(--ac);color:#fff;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0">5</span> Uso oficial</div>
+            <div style="font-size:13px;color:var(--ink2);line-height:1.7">Esta aplicación no reemplaza los sistemas oficiales de registro académico de su institución. Es una herramienta de apoyo personal al docente y no tiene valor jurídico como documento oficial.</div>
+          </div>
+        </div>
+
+        <div style="margin-top:20px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:var(--rs);padding:14px 16px;font-size:12px;color:#1D4ED8;line-height:1.7">
+          ℹ️ Al pulsar <strong>"Acepto y continúo"</strong> usted declara haber leído y aceptado la totalidad de estas condiciones de uso.
+        </div>
+      </div>
+    </div>
+
+    <!-- Botones fijos al fondo -->
+    <div style="flex-shrink:0;padding:16px 24px;border-top:1px solid var(--br);background:var(--sf);display:flex;gap:10px">
+      <button onclick="wlReject()" style="flex:1;padding:14px;border-radius:12px;border:2px solid var(--br);background:var(--sf);color:var(--ink3);font-size:14px;font-weight:600;cursor:pointer">
+        ✗ No acepto
+      </button>
+      <button onclick="wlAccept()" style="flex:2;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,#3B82F6,#6366F1);color:#fff;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(99,102,241,.35)">
+        ✓ Acepto y continúo
+      </button>
+    </div>
+  </div>
+</div>
 <!-- PRIMER ACCESO ANDROID -->
 <div class="ov" id="android-first-ov" style="z-index:10000">
   <div class="modal" style="max-width:480px;text-align:center">
@@ -2324,7 +2288,7 @@ function showTipoHelp(){
 let profile={},courses=[],records=[],students={},attendance={},grades={},perCfg={},syncCfg={},voicesCfg={};
 let curView='GENERAL',editRec=null,editCourse=null,confCb=null;
 let srch='',fTipo='',fAsig='',fPer='',sCol='fecha',sDir='desc';
-let wStep=1,wCourses=[],wcCol=PAL[0],cSubs=[],cCol=PAL[0];
+let cSubs=[],cCol=PAL[0];
 let editEstId=null,editEstC=null,editEstP=null;
 let curPillar='saber';
 let pendActC=null,pendActA=null,pendActP=null;
@@ -5068,46 +5032,7 @@ function licFormatInput(el){
 // ════════════════════
 // ONBOARDING PIN SETUP
 // ════════════════════
-let _obPinBuf='',_obPinFirst='',_obPinConfirm=false;
-
-function obPinKey(d){
-  if(_obPinBuf.length>=6)return;
-  _obPinBuf+=d;obPinDots();
-}
-function obPinDel(){_obPinBuf=_obPinBuf.slice(0,-1);obPinDots();}
-function obPinDots(){
-  for(let i=0;i<6;i++){const d=document.getElementById('opd'+i);if(d)d.classList.toggle('filled',i<_obPinBuf.length);}
-  // Auto-advance after 4+ digits on first entry, or match on confirm
-  if(_obPinBuf.length>=4&&!_obPinConfirm){
-    // Show confirm button hint
-    const m=document.getElementById('ob-pin-msg');
-    if(m){m.style.color='var(--ink3)';m.textContent=_obPinBuf.length+' dígitos — toca ✓ para confirmar';}
-  }
-  if(_obPinConfirm&&_obPinBuf.length>=_obPinFirst.length)obPinConfirmStep();
-}
-async function obPinConfirmStep(){
-  if(!_obPinConfirm){
-    if(_obPinBuf.length<4){toast('Mínimo 4 dígitos','e');return;}
-    _obPinFirst=_obPinBuf;_obPinBuf='';_obPinConfirm=true;obPinDots();
-    const s=document.getElementById('ob-pin-subtitle');if(s)s.textContent='Confirma tu PIN';
-    const m=document.getElementById('ob-pin-msg');if(m){m.style.color='var(--ink3)';m.textContent='Ingresa el mismo PIN para confirmar';}
-  } else {
-    if(_obPinBuf!==_obPinFirst){
-      const m=document.getElementById('ob-pin-msg');
-      if(m){m.style.color='var(--rd)';m.textContent='No coinciden. Vuelve a intentarlo.';}
-      _obPinBuf='';_obPinFirst='';_obPinConfirm=false;obPinDots();
-      const s=document.getElementById('ob-pin-subtitle');if(s)s.textContent='Elige un PIN de 4 a 6 dígitos';
-    } else {
-      const hash=await sha256(_obPinBuf);
-      localStorage.setItem(SK_PIN,hash);
-      sessionStorage.setItem('bda_unlocked','1');
-      await obOfferBio();
-    }
-  }
-}
 // Button to advance from first to confirm step
-function obPinNext(){if(!_obPinConfirm&&_obPinBuf.length>=4)obPinConfirmStep();}
-
 async function obOfferBio(){
   if(!window.PublicKeyCredential){obFinishPin();return;}
   const avail=await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().catch(()=>false);
@@ -5131,19 +5056,6 @@ async function obOfferBio(){
   obFinishPin();
 }
 
-function obFinishPin(){
-  _obPinBuf='';_obPinFirst='';_obPinConfirm=false;
-  document.getElementById('onboard-ov').style.display='none';
-  document.getElementById('wizard').style.display='flex';
-  wStep=1;wCourses=[];wcCol=PAL[0];renderWStep();
-}
-function obSkipPin(){
-  _obPinBuf='';_obPinFirst='';_obPinConfirm=false;
-  document.getElementById('onboard-ov').style.display='none';
-  document.getElementById('wizard').style.display='flex';
-  wStep=1;wCourses=[];wcCol=PAL[0];renderWStep();
-}
-
 // ════════════════════
 // PIN MANAGEMENT (settings)
 // ════════════════════
@@ -5159,79 +5071,6 @@ function removePin(){
   if(!confirm('¿Eliminar PIN? La app quedará sin protección.'))return;
   localStorage.removeItem(SK_PIN);localStorage.removeItem(SK_BIO);
   sessionStorage.removeItem('bda_unlocked');toast('PIN eliminado','s');
-}
-
-function obStep(n){
-  [1,2,3,'tablet','pin'].forEach(s=>{
-    const el=document.getElementById('ob-step-'+s);
-    if(el) el.style.display=(s===n)?'':'none';
-  });
-}
-
-function obSelectDevice(device){
-  localStorage.setItem(SK_DEVICE,device);
-  if(device==='pc'){
-    // PC: show PIN setup first, then wizard
-    obStep('pin');
-    _obPinBuf='';_obPinFirst='';_obPinConfirm=false;
-    const s=document.getElementById('ob-pin-subtitle');
-    if(s)s.textContent='Elige un PIN de 4 a 6 dígitos para proteger tus datos';
-    const m=document.getElementById('ob-pin-msg');if(m)m.textContent='';
-    obPinDots();
-  } else {
-    // Tablet: show sync step
-    obStep('tablet');
-  }
-}
-
-async function obTabletConnect(){
-  const url=(document.getElementById('ob-tablet-url')?.value||'').trim();
-  if(!url){toast('Ingresa la URL','e');return;}
-  if(!url.startsWith('https://script.google.com')){toast('La URL debe ser de script.google.com','e');return;}
-  const btn=document.getElementById('ob-tablet-btn');
-  const status=document.getElementById('ob-tablet-status');
-  btn.disabled=true;btn.textContent='Conectando…';
-  status.textContent='⏳ Conectando con la nube…';
-  try{
-    const resp=await fetch(url+'?t='+Date.now());
-    if(!resp.ok) throw new Error('HTTP '+resp.status);
-    const data=await resp.json();
-    // Load data
-    if(data.profile)profile=data.profile;
-    if(data.courses)courses=data.courses;
-    if(data.records)records=data.records;
-    if(data.students)students=data.students;
-    if(data.attendance)attendance=data.attendance;
-    if(data.grades)grades=data.grades;
-    if(data.perCfg)perCfg=data.perCfg;
-    if(data.horarios)horarios=data.horarios;
-    if(data.horNames)horNames=data.horNames;
-    if(data.asignacion)asignacion=data.asignacion;
-    if(data.perTemplate)perTemplate=data.perTemplate;
-    if(data.seguimiento)seguimiento=data.seguimiento;
-    if(data.voicesCfg)voicesCfg=data.voicesCfg;
-    if(data.syncCfg)syncCfg=data.syncCfg;
-    syncCfg.url=url; // ensure URL is saved
-    saveSyncCfg();saveSeg();saveScheduleData();
-    localStorage.setItem(SK.s,'1');
-    save(true);
-    status.textContent='✅ Datos cargados correctamente';
-    setTimeout(()=>{
-      document.getElementById('onboard-ov').style.display='none';
-      init(true);
-      toast('¡Bitácora lista! Datos sincronizados desde la nube 🎉','s');
-    },800);
-  } catch(err){
-    btn.disabled=false;btn.textContent='☁️ Conectar y cargar datos';
-    status.textContent='❌ No se pudo conectar. Verifique la URL e intente de nuevo.';
-  }
-}
-
-function showOnboarding(){
-  const ov=document.getElementById('onboard-ov');
-  if(!ov)return;
-  obStep(1);
-  ov.style.display='flex';
 }
 
 // ── Fullscreen ──
@@ -5728,55 +5567,6 @@ function toast(msg,t='s'){
 // ══════════════════════════
 // WIZARD
 // ══════════════════════════
-const WSTEPS=[
-  {label:'Paso 1 de 3',title:'¡Bienvenido! 👋',sub:'Cuéntanos quién eres.'},
-  {label:'Paso 2 de 3',title:'Tu institución 🏫',sub:'¿Dónde trabajas?'},
-  {label:'Paso 3 de 3',title:'Tus cursos 📚',sub:'Agrega los cursos a tu cargo.'}
-];
-function renderWStep(){
-  const s=WSTEPS[wStep-1];
-  document.getElementById('wbar').style.width=(wStep/3*100)+'%';
-  document.getElementById('wstep').textContent=s.label;document.getElementById('wtitle').textContent=s.title;document.getElementById('wsub').textContent=s.sub;
-  document.getElementById('wback').style.display=wStep>1?'inline-flex':'none';
-  document.getElementById('wnext').textContent=wStep===3?'¡Comenzar! 🚀':'Siguiente →';
-  const b=document.getElementById('wbody');
-  if(wStep===1)b.innerHTML='<div class="fg"><label>Nombre completo *</label><input id="w-nom" placeholder="María García" value="'+esc(profile.nombre||'')+'"></div><div class="fg"><label>Título / Cargo</label><input id="w-tit" placeholder="Licenciado en Matemáticas"></div><div class="frow"><div class="fg"><label>Correo</label><input type="email" id="w-email" placeholder="correo@..."></div><div class="fg"><label>Año lectivo</label><input id="w-anio" placeholder="2026" value="2026"></div></div>';
-  else if(wStep===2)b.innerHTML='<div class="fg"><label>Institución *</label><input id="w-inst" placeholder="Nombre del colegio"></div><div class="frow"><div class="fg"><label>Municipio</label><input id="w-ciudad" placeholder="Cereté"></div><div class="fg"><label>Teléfono</label><input id="w-tel" placeholder="300 123 4567"></div></div>';
-  else renderWC();
-}
-function renderWC(){
-  const b=document.getElementById('wbody');
-  const list=wCourses.map((c,i)=>'<div style="display:flex;align-items:center;gap:7px;padding:7px 9px;background:var(--sf2);border-radius:var(--rs);border:1px solid '+c.color+'30"><div style="width:9px;height:9px;border-radius:50%;background:'+c.color+';flex-shrink:0"></div><div style="flex:1"><strong>'+esc(c.nombre)+'</strong> <span style="font-size:11px;color:var(--ink3)">'+esc(c.grado||'')+'</span>'+(c.subjects?.length?'<div style="font-size:11px;color:var(--ink3)">'+c.subjects.join(', ')+'</div>':'')+' </div><button class="btn xs danger" onclick="rmWC('+i+')">✕</button></div>').join('');
-  const rc=PAL[wCourses.length%PAL.length];
-  b.innerHTML=(list?'<div style="display:flex;flex-direction:column;gap:5px;max-height:155px;overflow-y:auto;margin-bottom:7px">'+list+'</div>':'')+
-    '<div style="background:var(--sf2);border:1px dashed var(--br);border-radius:var(--rs);padding:13px;display:flex;flex-direction:column;gap:9px">'+
-    '<div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--ink3)">Nuevo curso</div>'+
-    '<div class="frow"><div class="fg"><label>Nombre *</label><input id="wc-nom" placeholder="10-A"></div><div class="fg"><label>Grado</label><input id="wc-grado" placeholder="Décimo"></div></div>'+
-    '<div class="fg"><label>Color</label><div class="cp-row" id="wcp">'+PAL.map(c=>'<div class="cp-dot '+(c===rc?'sel':'')+'" style="background:'+c+'" onclick="pickWC(\''+c+'\')" data-c="'+c+'"></div>').join('')+'</div></div>'+
-    '<div class="fg"><label>Asignaturas (coma)</label><input id="wc-subs" placeholder="Matemáticas, Física"></div>'+
-    '<button class="btn sm" onclick="addWC()" style="align-self:flex-start">+ Agregar curso</button>'+
-    '</div>'+(!wCourses.length?'<div style="font-size:12px;color:var(--ink3);text-align:center;margin-top:5px">Agrega al menos un curso.</div>':'');
-  wcCol=rc;
-}
-function pickWC(c){wcCol=c;document.querySelectorAll('#wcp .cp-dot').forEach(el=>el.classList.toggle('sel',el.dataset.c===c));}
-function addWC(){
-  const nom=(document.getElementById('wc-nom')?.value||'').trim();if(!nom){toast('El nombre es obligatorio','e');return;}
-  const grado=(document.getElementById('wc-grado')?.value||'').trim();
-  const subs=(document.getElementById('wc-subs')?.value||'').split(',').map(s=>s.trim()).filter(Boolean);
-  wCourses.push({nombre:nom,grado,color:wcCol,subjects:subs});renderWC();
-}
-function rmWC(i){wCourses.splice(i,1);renderWC();}
-function wNext(){
-  if(wStep===1){const n=(document.getElementById('w-nom')?.value||'').trim();if(!n){toast('El nombre es obligatorio','e');return;}profile.nombre=n;profile.titulo=(document.getElementById('w-tit')?.value||'').trim();profile.email=(document.getElementById('w-email')?.value||'').trim();profile.anio=(document.getElementById('w-anio')?.value||'2026').trim();}
-  else if(wStep===2){const inst=(document.getElementById('w-inst')?.value||'').trim();if(!inst){toast('La institución es obligatoria','e');return;}profile.institucion=inst;profile.ciudad=(document.getElementById('w-ciudad')?.value||'').trim();profile.tel=(document.getElementById('w-tel')?.value||'').trim();}
-  else{if(!wCourses.length){toast('Agrega al menos un curso','e');return;}wCourses.forEach(c=>courses.push({id:uid(),...c}));localStorage.setItem(SK.s,'1');save();document.getElementById('wizard').style.display='none';
-    // After wizard: if no sync URL, show sync setup; otherwise go straight to app
-    if(!_isDriveReady()){ showSyncWelcome(); } else { cloudPull(); init(true); }
-    toast('¡Datos guardados! 🎉','s');return;}
-  wStep++;renderWStep();
-}
-function wPrev(){if(wStep>1){wStep--;renderWStep();}}
-
 // ══════════════════════════
 // CLOSE OVERLAYS
 // ══════════════════════════
@@ -11529,6 +11319,47 @@ function copyFirstUrl(){
   if(navigator.clipboard){navigator.clipboard.writeText(url).then(()=>toast('URL copiada ✅','s'));}
   else{toast('Copia manualmente la URL','s');}
 }
+// ══════════════════════════════════════════════════
+// BIENVENIDA + DESCARGO DE RESPONSABILIDADES
+// ══════════════════════════════════════════════════
+function showWelcomeLegal(afterFn){
+  window._wlAfterFn=afterFn||null;
+  const ov=document.getElementById('welcome-legal-ov');
+  if(!ov)return;
+  // Mostrar pantalla 1
+  document.getElementById('wl-p1').style.display='flex';
+  document.getElementById('wl-p2').style.display='none';
+  ov.style.display='block';
+}
+
+function wlGoToLegal(){
+  document.getElementById('wl-p1').style.display='none';
+  const p2=document.getElementById('wl-p2');
+  p2.style.display='flex';
+  // Scroll al inicio del contenido
+  const scrollable=p2.querySelector('[style*="overflow-y:auto"]');
+  if(scrollable)scrollable.scrollTop=0;
+}
+
+function wlAccept(){
+  const ov=document.getElementById('welcome-legal-ov');
+  if(ov)ov.style.display='none';
+  // Continuar con el flujo posterior (first-profile o android-first)
+  if(typeof window._wlAfterFn==='function'){
+    window._wlAfterFn();
+    window._wlAfterFn=null;
+  }
+}
+
+function wlReject(){
+  if(confirm('¿Estás seguro de que no deseas aceptar?\n\nNo podrás usar Bitácora Docente sin aceptar el descargo de responsabilidades.')){
+    // Volver a pantalla 1 para que pueda reconsiderar
+    document.getElementById('wl-p1').style.display='flex';
+    document.getElementById('wl-p2').style.display='none';
+  }
+}
+
+
 function init(skip){
   loadScheduleData();loadSeg();load();rebuildMdiaTipoSel();
   // En Android: limpiar sesión desbloqueada para que el PIN siempre se solicite
@@ -11545,8 +11376,18 @@ function init(skip){
     // Web: verificar Drive
     if(!_isDriveReady()){showSyncWelcome();return;}
     // Web: si tiene datos → app; si no → onboarding web
-    if(!localStorage.getItem(SK.s)&&!skip){cloudPull();showOnboarding();return;}
-    checkAuthGate(()=>showWelcome(()=>_initMain(skip)));
+    // Primera vez con Drive → cloudPull y esperar resultado
+    if(!localStorage.getItem(SK.s)&&!skip){
+      window._driveConnectPending=true;
+      cloudPull();
+      setTimeout(function(){
+        if(!window._driveConnectPending)return;
+        window._driveConnectPending=false;
+        _enterAppAfterDrive();
+      },8000);
+      return;
+    }
+    checkAuthGate(()=>_initMain(skip));
   });
 }
 
@@ -11840,18 +11681,29 @@ function _afterDriveConnect(){
 }
 
 function _enterAppAfterDrive(){
-  if(document.querySelector('.page.on'))return;
+  // Cerrar pantalla de conexión Drive si está visible
+  var swOv=document.getElementById('sync-welcome-ov');
+  if(swOv)swOv.style.display='none';
+
+  localStorage.setItem(SK.s,'1');
 
   if(courses&&courses.length>0){
-    // Tiene datos → marcar setup completo → PIN → Mi Día
-    localStorage.setItem(SK.s,'1');
+    // Tiene datos del Drive → PIN → Mi Día
     checkAuthGate(function(){_initMain(true);});
-  } else if(typeof AndroidDrive!=='undefined'){
-    // Android + Drive vacío → pantalla de elección (aquí o PC)
-    document.getElementById('android-first-ov').classList.add('open');
   } else {
-    // Web + Drive vacío → formulario de datos básicos
-    document.getElementById('first-profile-ov').classList.add('open');
+    // Drive vacío → mostrar bienvenida + descargo primero
+    showWelcomeLegal(function(){
+      if(typeof AndroidDrive!=='undefined'){
+        // Android → elegir tablet o PC
+        document.getElementById('android-first-ov').classList.add('open');
+      } else {
+        // Web → formulario datos básicos
+        _initMain(true);
+        setTimeout(function(){
+          document.getElementById('first-profile-ov').classList.add('open');
+        },400);
+      }
+    });
   }
 }
 function clearSync(){if(!confirm('Desconectar? Los datos locales se conservan.'))return;webDriveSignOut();syncCfg={};saveSyncCfg();syncStatus='idle';renderSyncPanel&&renderSyncPanel();toast('Desconectado','s');}
