@@ -11214,28 +11214,26 @@ function saveFirstProfile(){
   const inst=(document.getElementById('fp-inst')?.value||'').trim();
   if(!nombre){toast('Ingresa tu nombre para continuar','e');return;}
   if(!inst){toast('Ingresa el nombre de tu institución','e');return;}
-  // Guardar perfil
   profile.nombre=nombre;
   profile.titulo=(document.getElementById('fp-titulo')?.value||'').trim();
   profile.institucion=inst;
   profile.ciudad=(document.getElementById('fp-ciudad')?.value||'').trim();
   profile.email=(document.getElementById('fp-email')?.value||'').trim();
   localStorage.setItem(SK.s,'1');
-  save();
-  // Cerrar overlay
+  save(true); // silencioso — evita auto-push duplicado
   document.getElementById('first-profile-ov').classList.remove('open');
-  // Subir a Drive y entrar a la app
-  // cloudPush es async — esperamos que complete antes de entrar
   const doEnter=function(){
     checkAuthGate(function(){
       _initMain(true);
       setTimeout(function(){
-        toast('¡Bienvenido a Bitácora Docente! Agrega tus cursos desde Configuración → Cursos.','s');
+        toast('¡Bienvenido a Bitácora Docente! Agrega tus cursos desde Configuración.','s');
       },600);
     });
   };
   if(_isDriveReady()){
-    cloudPush().then?cloudPush().then(doEnter):setTimeout(doEnter,1500);
+    var _p=cloudPush(); // una sola llamada
+    if(_p&&typeof _p.then==='function'){_p.then(doEnter);}
+    else{setTimeout(doEnter,1500);}
   } else {
     doEnter();
   }
@@ -11560,11 +11558,19 @@ async function _gFile(fid){
   if(d.files&&d.files.length){_gEID=d.files[0].id;return _gEID;}return null;
 }
 async function _gPush(payload){
-  var ok=await _gEnsure();if(!ok)return false;
-  var fid=await _gFolder();var eid=await _gFile(fid);var resp;
+  // Lock para evitar pushes concurrentes que crearían archivos duplicados
+  if(window._gPushing){await new Promise(function(r){setTimeout(r,600);});}
+  window._gPushing=true;
+  var _pr=false;
+  var ok=await _gEnsure();
+  if(ok){
+    var fid=await _gFolder();var eid=await _gFile(fid);var resp;
   if(eid){resp=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+eid+'?uploadType=media',{method:'PATCH',headers:{Authorization:'Bearer '+_gAT,'Content-Type':'application/json'},body:payload});}
   else{var form=new FormData();form.append('metadata',new Blob([JSON.stringify({name:DRIVE_FILE_NAME,parents:[fid]})],{type:'application/json'}));form.append('file',new Blob([payload],{type:'application/json'}));resp=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{Authorization:'Bearer '+_gAT},body:form});try{var nd=await resp.clone().json();if(nd.id)_gEID=nd.id;}catch(e){}}
-  return resp&&resp.ok;
+    _pr=!!(resp&&resp.ok);
+  }
+  window._gPushing=false;
+  return _pr;
 }
 async function _gPull(){
   var ok=await _gEnsure();if(!ok)return null;
