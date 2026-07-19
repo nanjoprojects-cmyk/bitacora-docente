@@ -11230,10 +11230,13 @@ function saveFirstProfile(){
       },600);
     });
   };
-  // No pushear a Drive con datos vacíos — el primer push real
-  // ocurre cuando el docente guarde sus primeros cursos
-  // Solo entramos a la app
-  doEnter();
+  if(_isDriveReady()){
+    var _p=cloudPush();
+    if(_p&&typeof _p.then==='function'){_p.then(doEnter);}
+    else{setTimeout(doEnter,1500);}
+  } else {
+    doEnter();
+  }
 }
 function renderAnioPanel(){
   const el=document.getElementById('panel-anio');if(!el)return;
@@ -11364,7 +11367,10 @@ function init(skip){
   checkLicense(()=>{
     if(typeof AndroidDrive!=='undefined'){
       var deviceEmail=AndroidDrive.checkSignInStatus();
-      if(!deviceEmail){AndroidDrive.signIn();return;}
+      if(!deviceEmail){
+        window._androidSigningFromInit=true;
+        AndroidDrive.signIn();return;
+      }
       syncCfg.googleEmail=deviceEmail;saveSyncCfg();
       _afterDriveConnect();return;
     }
@@ -11668,9 +11674,18 @@ function onBackupLoaded(jsonStr){
 
 function onAndroidSignIn(email,name){
   syncCfg.googleEmail=email;syncCfg.googleName=name;saveSyncCfg();
+  renderSyncPanel&&renderSyncPanel();
+  // Caso 1: viene desde showSyncWelcome
   var ov=document.getElementById('sync-welcome-ov');
   if(ov&&ov.style.display!=='none'){_onWelcomeSignIn(email);return;}
-  toast('Conectado con Google Drive','s');renderSyncPanel&&renderSyncPanel();
+  // Caso 2: viene desde init() directamente (primer inicio sin overlay)
+  if(window._androidSigningFromInit){
+    window._androidSigningFromInit=false;
+    _afterDriveConnect();return;
+  }
+  // Caso 3: reconexión manual
+  toast('Conectado con Google Drive','s');
+  renderSyncPanel&&renderSyncPanel();
 }
 function onAndroidSignOut(){delete syncCfg.googleEmail;delete syncCfg.googleName;saveSyncCfg();renderSyncPanel&&renderSyncPanel();toast('Sesion cerrada','s');}
 function onAndroidSignInError(code){toast('Error al iniciar sesion ('+code+')','e');var b=document.getElementById('sw-drive-btn');if(b){b.disabled=false;b.textContent='Conectar con Google';}}
