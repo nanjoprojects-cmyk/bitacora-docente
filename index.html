@@ -1341,6 +1341,7 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
         <div class="tab" id="tab-voces" onclick="cfgTab('voces')">🗣️ Voces</div>
         <div class="tab" id="tab-pin" onclick="cfgTab('pin')">🔐 Seguridad</div>
         <div class="tab" id="tab-exportar" onclick="cfgTab('exportar')">⬇ Exportar</div>
+        <div class="tab" id="tab-anio" onclick="cfgTab('anio')">🔄 Año Académico</div>
       </div>
       <div id="panel-perfil">
         <div class="card">
@@ -1440,6 +1441,7 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
       <div id="panel-sync" style="display:none"></div>
       <div id="panel-pin" style="display:none"></div>
       <div id="panel-exportar" style="display:none"></div>
+      <div id="panel-anio" style="display:none"></div>
 
       <!-- PANEL VOCES DEL DESEMPEÑO -->
       <div id="panel-voces" style="display:none">
@@ -2177,6 +2179,66 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
 
 <input type="file" id="import-file" accept=".json" style="display:none" onchange="doImport(this)">
 <div class="toast-c" id="toast-c"></div>
+<!-- PRIMER ACCESO ANDROID -->
+<div class="ov" id="android-first-ov" style="z-index:10000">
+  <div class="modal" style="max-width:480px;text-align:center">
+    <div style="padding:36px 32px">
+      <div style="font-size:48px;margin-bottom:16px">📱</div>
+      <div style="font-size:20px;font-weight:700;color:var(--ink);margin-bottom:8px">¡Bienvenido a Bitácora Docente!</div>
+      <div style="font-size:13px;color:var(--ink3);line-height:1.7;margin-bottom:28px">Es tu primera vez. ¿Dónde deseas configurar tu cuenta?</div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <button class="btn primary" style="padding:14px;font-size:15px" onclick="androidFirstHere()">
+          📱 Registrar aquí en la Tablet
+        </button>
+        <button class="btn" style="padding:14px;font-size:15px" onclick="androidFirstPC()">
+          💻 Registrar desde el PC
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PRIMER ACCESO — FORMULARIO DE PERFIL -->
+<div class="ov" id="first-profile-ov" style="z-index:10000">
+  <div class="modal" style="max-width:500px">
+    <div class="mhdr">
+      <div class="mtitle">👤 Datos básicos</div>
+      <button class="mx" onclick="firstProfileCancel()" title="Cerrar">✕</button>
+    </div>
+    <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+      <div style="font-size:13px;color:var(--ink3);line-height:1.6">
+        Ingresa tus datos básicos para comenzar. Los cursos y estudiantes los podrás agregar después desde <strong>Configuración</strong>.
+      </div>
+      <div class="fg"><label>Nombre completo *</label><input id="fp-nombre" placeholder="Ej: María González" autocomplete="off"></div>
+      <div class="fg"><label>Título / Cargo</label><input id="fp-titulo" placeholder="Ej: Licenciada en Matemáticas" autocomplete="off"></div>
+      <div class="fg"><label>Institución *</label><input id="fp-inst" placeholder="Ej: Colegio Nacional" autocomplete="off"></div>
+      <div class="fg"><label>Ciudad</label><input id="fp-ciudad" placeholder="Ej: Barranquilla" autocomplete="off"></div>
+      <div class="fg"><label>Email</label><input id="fp-email" type="email" placeholder="correo@ejemplo.com" autocomplete="off"></div>
+      <div style="display:flex;gap:9px;margin-top:4px">
+        <button class="btn primary" onclick="saveFirstProfile()" style="flex:1">✓ Guardar y comenzar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PRIMER ACCESO — OPCIÓN PC -->
+<div class="ov" id="android-pc-ov" style="z-index:10000">
+  <div class="modal" style="max-width:460px;text-align:center">
+    <div style="padding:32px 28px">
+      <div style="font-size:42px;margin-bottom:14px">💻</div>
+      <div style="font-size:18px;font-weight:700;color:var(--ink);margin-bottom:10px">Configura desde tu PC</div>
+      <div style="font-size:13px;color:var(--ink3);line-height:1.7;margin-bottom:20px">
+        Accede desde un navegador en tu computador a la siguiente dirección y completa el registro inicial. Luego vuelve aquí — tus datos se sincronizarán automáticamente.
+      </div>
+      <div style="background:var(--aml);border-radius:var(--rs);padding:14px;margin-bottom:20px;cursor:pointer" onclick="copyFirstUrl()">
+        <div style="font-size:12px;font-weight:700;color:var(--ac)">🔗 Dirección de la app web</div>
+        <div id="first-url-txt" style="font-size:13px;font-weight:600;color:var(--ink);margin-top:4px;word-break:break-all">https://nanjoprojects-cmyk.github.io/bitacora-docente/</div>
+        <div style="font-size:11px;color:var(--ink3);margin-top:4px">Toca para copiar</div>
+      </div>
+      <button class="btn" onclick="document.getElementById('android-pc-ov').classList.remove('open');document.getElementById('android-first-ov').classList.add('open')">← Volver</button>
+    </div>
+  </div>
+</div>
 
 <script>
 // ══════════════════════════
@@ -4257,7 +4319,7 @@ function initParcialAct(cId,asig,per,pilar){
 // CONFIG
 // ══════════════════════════
 function cfgTab(t){
-  ['perfil','cursos','periodos','estudiantes','horarios','sync','voces','pin','exportar'].forEach(x=>{
+  ['perfil','cursos','periodos','estudiantes','horarios','sync','voces','pin','exportar','anio'].forEach(x=>{
     const tab=document.getElementById('tab-'+x);
     const panel=document.getElementById('panel-'+x);
     if(tab) tab.classList.toggle('on',x===t);
@@ -4269,6 +4331,7 @@ function cfgTab(t){
   if(t==='voces')renderVoicesPanel();
   if(t==='pin')renderPinPanel();
   if(t==='exportar')renderExportPanel();
+  if(t==='anio')renderAnioPanel();
   if(t==='horarios'){renderHorTabs();renderHorEditor(curHorTab||'A');renderAsigEditor();}
   if(t==='estudiantes'){
     fillCSel('est-curso','');
@@ -11102,6 +11165,370 @@ function refreshAutoAttSER(cId, asig, per){
   });
 }
 
+function showFirstAccess(){
+  if(typeof AndroidDrive!=='undefined'){
+    document.getElementById('android-first-ov').classList.add('open');
+  } else {
+    document.getElementById('first-profile-ov').classList.add('open');
+  }
+}
+
+function anioSelOp(op){
+  _anioOpcion=op;
+  document.getElementById('anio-op-prom-card').style.borderColor=op==='promover'?'var(--ac)':'var(--br)';
+  document.getElementById('anio-op-borr-card').style.borderColor=op==='borrar'?'var(--ac)':'var(--br)';
+  document.querySelector('[name="anio-op"][value="'+op+'"]').checked=true;
+}
+
+function _buildAnioBackup(){
+  const nombre=(document.getElementById('anio-nombre')?.value||'').trim()||new Date().getFullYear();
+  return {
+    _tipo:'respaldo_anio',
+    _anio:nombre,
+    _fecha:new Date().toISOString(),
+    _v:'2026',
+    profile,courses,records,students,attendance,grades,
+    perCfg,horarios,horNames,asignacion,seguimiento,voicesCfg
+  };
+}
+
+async function crearRespaldoAnio(){
+  const st=document.getElementById('anio-backup-status');
+  const nombre=(document.getElementById('anio-nombre')?.value||'').trim()||String(new Date().getFullYear());
+  if(st)st.textContent='Creando respaldo…';
+  const payload=JSON.stringify(_buildAnioBackup());
+  const fileName='bitacora_respaldo_'+nombre+'.json';
+
+  // Android: usar método específico para archivo con nombre propio
+  if(typeof AndroidDrive!=='undefined'){
+    if(typeof AndroidDrive.saveBackupNamed!=='undefined'){
+      AndroidDrive.saveBackupNamed(payload, fileName);
+      if(st)st.textContent='Guardando en Drive…';
+      // onBackupNamedSaved() se llama desde Kotlin
+    } else {
+      // Fallback: solo descarga local si no hay método específico
+      descargarRespaldoAnio();
+      if(st)st.textContent='⚠️ Respaldo descargado localmente. Actualiza la app para guardarlo en Drive.';
+    }
+    return;
+  }
+
+  // Web: subir como archivo separado al Drive
+  if(!syncCfg.webDriveConnected){
+    if(st)st.textContent='⚠️ Conecta con Google Drive primero.';
+    return;
+  }
+  const ok=await _gEnsure();
+  if(!ok){if(st)st.textContent='❌ Error de autenticación';return;}
+  const fid=await _gFolder();
+  // Verificar si ya existe el archivo (para actualizarlo)
+  const q=encodeURIComponent("name='"+fileName+"' and '"+fid+"' in parents and trashed=false");
+  const checkResp=await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id)',
+    {headers:{Authorization:'Bearer '+_gAT}});
+  const checkData=await checkResp.json();
+  let resp;
+  if(checkData.files&&checkData.files.length){
+    // Actualizar existente
+    resp=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+checkData.files[0].id+'?uploadType=media',{
+      method:'PATCH',headers:{Authorization:'Bearer '+_gAT,'Content-Type':'application/json'},body:payload
+    });
+  } else {
+    // Crear nuevo
+    const form=new FormData();
+    form.append('metadata',new Blob([JSON.stringify({name:fileName,parents:[fid]})],{type:'application/json'}));
+    form.append('file',new Blob([payload],{type:'application/json'}));
+    resp=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{
+      method:'POST',headers:{Authorization:'Bearer '+_gAT},body:form
+    });
+  }
+  if(resp&&resp.ok){
+    if(st)st.textContent='✅ Respaldo guardado en Drive: '+fileName;
+  } else {
+    if(st)st.textContent='❌ Error al guardar en Drive. Intenta descargar localmente.';
+  }
+}
+
+// Callback desde Android cuando saveBackupNamed completa
+function onBackupsListed(jsonStr){
+  const el=document.getElementById('anio-respaldos-lista');
+  if(!el)return;
+  try{
+    const files=JSON.parse(jsonStr||'[]');
+    if(!files.length){
+      el.innerHTML='<div style="font-size:13px;color:var(--ink3)">No hay respaldos guardados aún.</div>';
+      return;
+    }
+    el.innerHTML=files.map(f=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--br);border-radius:var(--rs);margin-bottom:6px;background:var(--sf)">
+        <span style="font-size:13px;font-weight:600;flex:1;color:var(--ink)">📄 ${esc(f.name||f)}</span>
+        <span style="font-size:11px;color:var(--ink3)">${f.date||''}</span>
+      </div>`).join('');
+  }catch(e){
+    if(el)el.innerHTML='<div style="color:var(--er)">Error al leer lista de respaldos</div>';
+  }
+}
+
+function onBackupNamedSaved(success, fileName){
+  const st=document.getElementById('anio-backup-status');
+  if(st)st.textContent=success?'✅ Respaldo guardado en Drive: '+fileName:'❌ Error al guardar respaldo en Drive';
+}
+
+function descargarRespaldoAnio(){
+  const nombre=(document.getElementById('anio-nombre')?.value||'').trim()||String(new Date().getFullYear());
+  const payload=JSON.stringify(_buildAnioBackup(),null,2);
+  const blob=new Blob([payload],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='bitacora_respaldo_'+nombre+'.json';
+  document.body.appendChild(a);a.click();
+  document.body.removeChild(a);URL.revokeObjectURL(url);
+  toast('Respaldo descargado ✅','s');
+}
+
+function confirmarInicializacion(){
+  if(!confirm('¿Inicializar año académico?\n\nEsto borrará TODAS las notas, asistencia, actividades y seguimiento.\n\nAsegúrate de haber creado el respaldo antes de continuar.\n\nEsta acción NO se puede deshacer.'))return;
+  ejecutarInicializacion(_anioOpcion);
+}
+
+function ejecutarInicializacion(opEstudiantes){
+  pushUndo('Inicializar año académico');
+
+  // ── Limpiar asistencia completa ──
+  attendance={};
+
+  // ── Limpiar seguimiento ──
+  seguimiento={};
+
+  // ── Limpiar notas: vaciar scores y actividades de cada grado
+  // pero conservar la estructura de perCfg (períodos, configuración) ──
+  grades={};
+  // También limpiar el objeto grades que está dentro de perCfg si existe
+  Object.keys(perCfg).forEach(cId=>{
+    const c=perCfg[cId];if(!c||typeof c!=='object')return;
+    Object.keys(c).forEach(asig=>{
+      const a=c[asig];if(!a||typeof a!=='object')return;
+      Object.keys(a).forEach(per=>{
+        const p=a[per];if(!p||typeof p!=='object')return;
+        // Limpiar scores, actividades y PxC pero preservar configuración de períodos
+        if(p.scores!==undefined) p.scores={};
+        if(p.activities!==undefined) p.activities=[];
+        if(p.pxcConfig!==undefined) delete p.pxcConfig;
+        if(p.voicesConfig!==undefined) delete p.voicesConfig;
+      });
+    });
+  });
+
+  // ── Estudiantes según opción ──
+  if(opEstudiantes==='borrar'){
+    students={};
+  }
+  // Si es 'promover': estudiantes se conservan tal cual
+  // El docente edita el grado del curso manualmente
+
+  // ── Limpiar records (registros de calificaciones finales) ──
+  records=[];
+
+  save();
+  cloudPush();
+  renderGrades&&renderGrades();
+  renderTP&&renderTP();
+  renderSB&&renderSB();
+
+  const msg=opEstudiantes==='borrar'
+    ?' Estudiantes borrados — carga los nuevos listados desde Configuración → Estudiantes.'
+    :' Estudiantes conservados — edita el grado de cada curso desde Configuración → Cursos.';
+  toast('✅ Año académico inicializado.'+msg,'s');
+  setTimeout(()=>cfgTab('cursos'),800);
+}
+
+async function cargarListaRespaldos(){
+  const el=document.getElementById('anio-respaldos-lista');
+  if(!el)return;
+  el.innerHTML='<div style="font-size:13px;color:var(--ink3)">Buscando respaldos…</div>';
+  if(typeof AndroidDrive!=='undefined'){
+    // Android: listar respaldos si el método existe
+    if(typeof AndroidDrive.listBackups!=='undefined'){
+      AndroidDrive.listBackups();
+      el.innerHTML='<div style="font-size:13px;color:var(--ink3)">Cargando lista de respaldos…</div>';
+    } else {
+      el.innerHTML='<div style="background:var(--aml);border-radius:var(--rs);padding:14px">'
+        +'<div style="font-size:13px;font-weight:600;margin-bottom:6px">💻 Consulta desde el PC</div>'
+        +'<div style="font-size:12px;color:var(--ink3)">Para ver tus respaldos anteriores, accede desde un navegador en tu PC a:</div>'
+        +'<div style="font-size:12px;font-weight:700;color:var(--ac);margin-top:6px">nanjoprojects-cmyk.github.io/bitacora-docente/</div>'
+        +'</div>';
+    }
+    return;
+  }
+  if(!syncCfg.webDriveConnected){
+    el.innerHTML='<div style="font-size:13px;color:var(--er)">Conecta con Google Drive para ver los respaldos.</div>';
+    return;
+  }
+  const ok=await _gEnsure();if(!ok){el.innerHTML='<div style="color:var(--er)">Error de autenticación</div>';return;}
+  const fid=await _gFolder();
+  const q=encodeURIComponent("name contains 'bitacora_respaldo_' and '"+fid+"' in parents and trashed=false");
+  const resp=await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc',
+    {headers:{Authorization:'Bearer '+_gAT}});
+  const data=await resp.json();
+  if(!data.files||!data.files.length){
+    el.innerHTML='<div style="font-size:13px;color:var(--ink3)">No hay respaldos guardados aún.</div>';
+    return;
+  }
+  el.innerHTML=data.files.map(f=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--br);border-radius:var(--rs);margin-bottom:6px;background:var(--sf)">
+      <span style="font-size:13px;font-weight:600;flex:1;color:var(--ink)">📄 ${esc(f.name)}</span>
+      <span style="font-size:11px;color:var(--ink3)">${new Date(f.modifiedTime).toLocaleDateString('es-CO')}</span>
+      <button class="btn xs" onclick="verRespaldo('${f.id}','${esc(f.name)}')">👁 Ver</button>
+    </div>`).join('');
+}
+
+async function verRespaldo(fileId,fileName){
+  const ok=await _gEnsure();if(!ok)return;
+  const resp=await fetch('https://www.googleapis.com/drive/v3/files/'+fileId+'?alt=media',
+    {headers:{Authorization:'Bearer '+_gAT}});
+  const data=await resp.json();
+  if(!data||!data.profile){toast('No se pudo leer el respaldo','e');return;}
+  // Mostrar en overlay de solo lectura
+  const ov=document.createElement('div');
+  ov.className='ov';ov.style.cssText='display:flex;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML=`<div style="background:var(--sf);border-radius:var(--r);max-width:520px;width:100%;padding:28px;max-height:80vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-size:16px;font-weight:700">📄 ${esc(fileName)}</div>
+      <button class="mx" onclick="this.closest('.ov').remove()">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--ink3);margin-bottom:14px">Modo de solo lectura</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="card"><div class="card-t">Docente</div><div>${esc(data.profile?.nombre||'—')}</div></div>
+      <div class="card"><div class="card-t">Institución</div><div>${esc(data.profile?.institucion||'—')}</div></div>
+      <div class="card"><div class="card-t">Año</div><div>${esc(data._anio||'—')}</div></div>
+      <div class="card"><div class="card-t">Fecha respaldo</div><div>${data._fecha?new Date(data._fecha).toLocaleDateString('es-CO'):'—'}</div></div>
+      <div class="card"><div class="card-t">Cursos</div><div>${data.courses?.length||0}</div></div>
+      <div class="card"><div class="card-t">Estudiantes</div><div>${Object.values(data.students||{}).flat().length||0}</div></div>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
+}
+
+
+function firstProfileCancel(){
+  if(confirm('¿Cerrar sin guardar? Podrás completar tu perfil después desde Configuración.')){
+    document.getElementById('first-profile-ov').classList.remove('open');
+    // Entrar a la app sin perfil completo
+    localStorage.setItem(SK.s,'1');
+    save();
+    checkAuthGate(function(){_initMain(true);});
+  }
+}
+function saveFirstProfile(){
+  const nombre=(document.getElementById('fp-nombre')?.value||'').trim();
+  const inst=(document.getElementById('fp-inst')?.value||'').trim();
+  if(!nombre){toast('Ingresa tu nombre para continuar','e');return;}
+  if(!inst){toast('Ingresa el nombre de tu institución','e');return;}
+  // Guardar perfil
+  profile.nombre=nombre;
+  profile.titulo=(document.getElementById('fp-titulo')?.value||'').trim();
+  profile.institucion=inst;
+  profile.ciudad=(document.getElementById('fp-ciudad')?.value||'').trim();
+  profile.email=(document.getElementById('fp-email')?.value||'').trim();
+  localStorage.setItem(SK.s,'1');
+  save();
+  // Cerrar overlay
+  document.getElementById('first-profile-ov').classList.remove('open');
+  // Subir a Drive y entrar a la app
+  // cloudPush es async — esperamos que complete antes de entrar
+  const doEnter=function(){
+    checkAuthGate(function(){
+      _initMain(true);
+      setTimeout(function(){
+        toast('¡Bienvenido a Bitácora Docente! Agrega tus cursos desde Configuración → Cursos.','s');
+      },600);
+    });
+  };
+  if(_isDriveReady()){
+    cloudPush().then?cloudPush().then(doEnter):setTimeout(doEnter,1500);
+  } else {
+    doEnter();
+  }
+}
+function renderAnioPanel(){
+  const el=document.getElementById('panel-anio');if(!el)return;
+  el.innerHTML=`
+  <div style="max-width:680px">
+    <h3 style="font-size:16px;font-weight:700;color:var(--ink);margin-bottom:6px">🔄 Inicializar Año Académico</h3>
+    <p style="font-size:13px;color:var(--ink3);margin-bottom:18px">
+      Al finalizar el año, respald <strong>todos tus datos</strong>, decide qué hacer con los estudiantes y limpia notas y asistencia para comenzar de cero.
+    </p>
+
+    <!-- Paso 1: Respaldo -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-t">1️⃣ Respaldar datos actuales</div>
+      <p style="font-size:13px;color:var(--ink2);margin-bottom:12px">Se guardará una copia completa en tu Drive con el nombre del año académico.</p>
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px">
+        <div class="fg" style="flex:1;min-width:180px">
+          <label>Nombre del año académico</label>
+          <input id="anio-nombre" placeholder="Ej: 2024-2025" value="${new Date().getFullYear()-1+'-'+new Date().getFullYear()}" autocomplete="off">
+        </div>
+        <button class="btn primary" onclick="crearRespaldoAnio()">☁️ Crear respaldo</button>
+        <button class="btn" onclick="descargarRespaldoAnio()">⬇ Descargar local</button>
+      </div>
+      <div id="anio-backup-status" style="font-size:12px;color:var(--ok);min-height:16px"></div>
+    </div>
+
+    <!-- Paso 2: Estudiantes -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-t">2️⃣ ¿Qué hacer con los estudiantes?</div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:12px;border:2px solid var(--br);border-radius:var(--rs);transition:.1s" id="anio-op-prom-card" onclick="anioSelOp('promover')">
+          <input type="radio" name="anio-op" value="promover" checked style="margin-top:2px;flex-shrink:0">
+          <div>
+            <div style="font-weight:700;font-size:13px">Promover estudiantes al siguiente nivel</div>
+            <div style="font-size:12px;color:var(--ink3);margin-top:3px">Los estudiantes se conservan en sus cursos. Deberás editar manualmente el grado de cada curso desde <strong>Configuración → Cursos</strong>.</div>
+          </div>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:12px;border:2px solid var(--br);border-radius:var(--rs);transition:.1s" id="anio-op-borr-card" onclick="anioSelOp('borrar')">
+          <input type="radio" name="anio-op" value="borrar" style="margin-top:2px;flex-shrink:0">
+          <div>
+            <div style="font-weight:700;font-size:13px">Borrar listados de estudiantes</div>
+            <div style="font-size:12px;color:var(--ink3);margin-top:3px">Los cursos se conservan vacíos. Deberás cargar los nuevos listados de estudiantes.</div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Paso 3: Ejecutar -->
+    <div class="card" style="border:2px solid var(--er)20;background:var(--er)08">
+      <div class="card-t" style="color:var(--er)">3️⃣ Ejecutar inicialización</div>
+      <div style="font-size:13px;color:var(--ink2);margin-bottom:14px">
+        Se conservará: perfil, institución, cursos (estructura), horarios.<br>
+        Se borrará: todas las notas, asistencia, actividades y seguimiento.
+      </div>
+      <button class="btn danger" onclick="confirmarInicializacion()" style="font-weight:700">
+        🔄 Inicializar año académico
+      </button>
+    </div>
+
+    <!-- Visor de respaldos -->
+    <div class="card" style="margin-top:18px">
+      <div class="card-t">📂 Respaldos anteriores</div>
+      <div style="font-size:13px;color:var(--ink3);margin-bottom:12px">Consulta tus respaldos guardados en Drive (solo lectura).</div>
+      <button class="btn" onclick="cargarListaRespaldos()">📋 Ver respaldos en Drive</button>
+      <div id="anio-respaldos-lista" style="margin-top:12px"></div>
+    </div>
+  </div>`;
+}
+function androidFirstHere(){
+  document.getElementById('android-first-ov').classList.remove('open');
+  document.getElementById('first-profile-ov').classList.add('open');
+}
+function androidFirstPC(){
+  document.getElementById('android-first-ov').classList.remove('open');
+  document.getElementById('android-pc-ov').classList.add('open');
+}
+function copyFirstUrl(){
+  const url='https://nanjoprojects-cmyk.github.io/bitacora-docente/';
+  if(navigator.clipboard){navigator.clipboard.writeText(url).then(()=>toast('URL copiada ✅','s'));}
+  else{toast('Copia manualmente la URL','s');}
+}
 function init(skip){
   loadScheduleData();loadSeg();load();rebuildMdiaTipoSel();
   // En Android: limpiar sesión desbloqueada para que el PIN siempre se solicite
@@ -11420,17 +11847,11 @@ function _enterAppAfterDrive(){
     localStorage.setItem(SK.s,'1');
     checkAuthGate(function(){_initMain(true);});
   } else if(typeof AndroidDrive!=='undefined'){
-    // Android + Drive vacío → Config → Sincronización (traer datos existentes)
-    localStorage.setItem(SK.s,'1');
-    _initMain(true);
-    setTimeout(function(){
-      showPage('config');
-      setTimeout(function(){cfgTab&&cfgTab('sync');renderSyncPanel&&renderSyncPanel();},300);
-    },500);
+    // Android + Drive vacío → pantalla de elección (aquí o PC)
+    document.getElementById('android-first-ov').classList.add('open');
   } else {
-    // Web + Drive vacío (primera vez real) → mostrar asistente de configuración
-    localStorage.removeItem(SK.s);
-    showOnboarding();
+    // Web + Drive vacío → formulario de datos básicos
+    document.getElementById('first-profile-ov').classList.add('open');
   }
 }
 function clearSync(){if(!confirm('Desconectar? Los datos locales se conservan.'))return;webDriveSignOut();syncCfg={};saveSyncCfg();syncStatus='idle';renderSyncPanel&&renderSyncPanel();toast('Desconectado','s');}
