@@ -11230,13 +11230,10 @@ function saveFirstProfile(){
       },600);
     });
   };
-  if(_isDriveReady()){
-    var _p=cloudPush(); // una sola llamada
-    if(_p&&typeof _p.then==='function'){_p.then(doEnter);}
-    else{setTimeout(doEnter,1500);}
-  } else {
-    doEnter();
-  }
+  // No pushear a Drive con datos vacíos — el primer push real
+  // ocurre cuando el docente guarde sus primeros cursos
+  // Solo entramos a la app
+  doEnter();
 }
 function renderAnioPanel(){
   const el=document.getElementById('panel-anio');if(!el)return;
@@ -11342,7 +11339,7 @@ function wlGoToLegal(){
 function wlAccept(){
   const ov=document.getElementById('welcome-legal-ov');
   if(ov)ov.style.display='none';
-  // Continuar con el flujo posterior (first-profile o android-first)
+  localStorage.setItem('bda_welcomed','1'); // marcar que aceptó los términos
   if(typeof window._wlAfterFn==='function'){
     window._wlAfterFn();
     window._wlAfterFn=null;
@@ -11588,7 +11585,10 @@ function _applyCloud(data){
   if(data.syncCfg){var sv={webDriveConnected:syncCfg.webDriveConnected,googleEmail:syncCfg.googleEmail,googleName:syncCfg.googleName};syncCfg=Object.assign({},data.syncCfg,sv);}
   saveScheduleData();saveSeg();save(true);
   // Marcar setup como completado si hay datos reales
-  if(courses&&courses.length>0){localStorage.setItem(SK.s,'1');}
+  if(courses&&courses.length>0||(profile&&profile.nombre)){
+    localStorage.setItem(SK.s,'1');
+    localStorage.setItem('bda_welcomed','1'); // si llegaron datos, ya pasó el welcome
+  }
   renderTP&&renderTP();renderSB&&renderSB();renderCurrentPage&&renderCurrentPage();
   syncStatus='ok';lastSync=Date.now();
   // Notificar que cloudPull completó (para _afterDriveConnect)
@@ -11601,8 +11601,14 @@ function _applyCloud(data){
 function _handleCloudConflict(data){
   var lTs=Number(localStorage.getItem('bda_local_ts')||0);
   var cTs=Number(data._ts||0);
-  var hasL=courses&&courses.length>0;var hasC=data.courses&&data.courses.length>0;
-  if(!hasL){if(hasC){_applyCloud(data);toast('Datos cargados desde Drive','s');}else{toast('Drive vacio - configura tu perfil y cursos','s');}return;}
+  // "tiene datos" = cursos O perfil con nombre
+  var hasL=(courses&&courses.length>0)||(profile&&profile.nombre);
+  var hasC=(data.courses&&data.courses.length>0)||(data.profile&&data.profile.nombre);
+  if(!hasL){
+    if(hasC){_applyCloud(data);toast('Datos cargados desde Drive','s');}
+    else{toast('Drive vacio - configura tus cursos desde Configuracion','s');}
+    return;
+  }
   if(!hasC){toast('Drive vacio - tus datos locales se conservan','s');return;}
   if(cTs>lTs){_applyCloud(data);toast('Datos actualizados desde Drive','s');return;}
   if(lTs>cTs&&lTs>0&&cTs>0){
@@ -11687,29 +11693,32 @@ function _afterDriveConnect(){
 }
 
 function _enterAppAfterDrive(){
-  // Cerrar pantalla de conexión Drive si está visible
   var swOv=document.getElementById('sync-welcome-ov');
   if(swOv)swOv.style.display='none';
-
   localStorage.setItem(SK.s,'1');
 
-  if(courses&&courses.length>0){
-    // Tiene datos del Drive → PIN → Mi Día
+  // "Con datos" = tiene cursos O tiene perfil con nombre
+  var hasMeaningfulData=(courses&&courses.length>0)||(profile&&profile.nombre);
+  var alreadyWelcomed=!!localStorage.getItem('bda_welcomed');
+
+  if(hasMeaningfulData){
+    // Tiene datos → PIN → Mi Día
     checkAuthGate(function(){_initMain(true);});
-  } else {
-    // Drive vacío → mostrar bienvenida + descargo primero
+  } else if(!alreadyWelcomed){
+    // Primera vez real → bienvenida + descargo
     showWelcomeLegal(function(){
       if(typeof AndroidDrive!=='undefined'){
-        // Android → elegir tablet o PC
         document.getElementById('android-first-ov').classList.add('open');
       } else {
-        // Web → formulario datos básicos
         _initMain(true);
         setTimeout(function(){
           document.getElementById('first-profile-ov').classList.add('open');
         },400);
       }
     });
+  } else {
+    // Ya aceptó términos pero Drive vacío (ej: sin cursos aún) → entrar directo
+    checkAuthGate(function(){_initMain(true);});
   }
 }
 function clearSync(){if(!confirm('Desconectar? Los datos locales se conservan.'))return;webDriveSignOut();syncCfg={};saveSyncCfg();syncStatus='idle';renderSyncPanel&&renderSyncPanel();toast('Desconectado','s');}
