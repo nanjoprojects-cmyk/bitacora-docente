@@ -11384,9 +11384,9 @@ function openPxcCopy(){
   if(!targets.length){
     el.innerHTML='<div style="font-size:13px;color:var(--ink3);text-align:center;padding:12px">No hay otros cursos/asignaturas disponibles.</div>';
   } else {
-    el.innerHTML=targets.map((t,i)=>`<label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:8px;border-radius:var(--rs);background:var(--sf2)">
-      <input type="checkbox" id="pxc-copy-cb-${i}" value="${i}" style="flex-shrink:0">
-      <span style="font-size:13px;color:var(--ink)">${esc(t.label)}</span>
+    el.innerHTML=targets.map((t,i)=>`<label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:8px;border-radius:var(--rs);background:var(--sf2);width:100%;box-sizing:border-box">
+      <input type="checkbox" id="pxc-copy-cb-${i}" value="${i}" style="flex-shrink:0;width:13px;height:13px;accent-color:var(--ac)">
+      <span style="font-size:13px;color:var(--ink);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.label)}</span>
     </label>`).join('');
   }
   window._pxcCopyTargets=targets;
