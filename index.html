@@ -11358,6 +11358,61 @@ function wlReject(){
 }
 
 
+// ── PxC: Copiar configuración a otros cursos ──
+function openPxcCopy(){
+  const{cId,asig,per}=_pxc;
+  // Construir lista de cursos destino (excluir el actual)
+  const el=document.getElementById('pxc-copy-list');
+  if(!el)return;
+  // Obtener todos los cursos disponibles
+  const targets=[];
+  courses.forEach(c=>{
+    // Para cada curso, incluir todas sus asignaturas y períodos activos
+    const perList=records.filter(r=>r.cId===c.id).map(r=>r.per);
+    const asigList=asignacion[c.id]?Object.keys(asignacion[c.id]):[];
+    asigList.forEach(a=>{
+      perList.forEach(p=>{
+        if(c.id===cId&&a===asig&&p===per)return; // excluir origen
+        targets.push({cId:c.id,asig:a,per:p,label:(c.nombre||c.id)+' · '+a+' · Per.'+p});
+      });
+    });
+  });
+  if(!targets.length){
+    el.innerHTML='<div style="font-size:13px;color:var(--ink3);text-align:center;padding:12px">No hay otros cursos/asignaturas disponibles.</div>';
+  } else {
+    el.innerHTML=targets.map((t,i)=>`
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:8px;border-radius:var(--rs);background:var(--sf2)">
+        <input type="checkbox" id="pxc-copy-cb-${i}" value="${i}" style="flex-shrink:0">
+        <span style="font-size:13px;color:var(--ink)">${esc(t.label)}</span>
+      </label>`).join('');
+  }
+  // Guardar targets para executePxcCopy
+  window._pxcCopyTargets=targets;
+  document.getElementById('pxc-copy-ov').classList.add('open');
+}
+
+function executePxcCopy(){
+  const{cId,asig,per}=_pxc;
+  const srcData=getGrD(cId,asig,per);
+  const cfg=srcData.pxcConfig;
+  if(!cfg){toast('Guarda la configuración primero','e');return;}
+  const targets=window._pxcCopyTargets||[];
+  let copied=0;
+  targets.forEach((t,i)=>{
+    const cb=document.getElementById('pxc-copy-cb-'+i);
+    if(!cb||!cb.checked)return;
+    const dstData=getGrD(t.cId,t.asig,t.per);
+    // Copiar configuración PxC (deep copy)
+    dstData.pxcConfig=JSON.parse(JSON.stringify(cfg));
+    copied++;
+  });
+  if(!copied){toast('Selecciona al menos un curso','e');return;}
+  pushUndo('Copiar PxC a '+copied+' curso(s)');
+  save();
+  document.getElementById('pxc-copy-ov').classList.remove('open');
+  toast('✅ Configuración PxC copiada a '+copied+' curso(s)','s');
+}
+
 function init(skip){
   loadScheduleData();loadSeg();load();rebuildMdiaTipoSel();
   // En Android: limpiar sesión desbloqueada para que el PIN siempre se solicite
