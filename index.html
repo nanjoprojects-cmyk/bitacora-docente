@@ -11361,32 +11361,34 @@ function wlReject(){
 // ── PxC: Copiar configuración a otros cursos ──
 function openPxcCopy(){
   const{cId,asig,per}=_pxc;
-  // Construir lista de cursos destino (excluir el actual)
   const el=document.getElementById('pxc-copy-list');
   if(!el)return;
-  // Obtener todos los cursos disponibles
   const targets=[];
+  const seen=new Set();
+  // Iterar cursos × asignaturas (c.subjects) × períodos (getPers)
   courses.forEach(c=>{
-    // Para cada curso, incluir todas sus asignaturas y períodos activos
-    const perList=records.filter(r=>r.cId===c.id).map(r=>r.per);
-    const asigList=asignacion[c.id]?Object.keys(asignacion[c.id]):[];
-    asigList.forEach(a=>{
-      perList.forEach(p=>{
-        if(c.id===cId&&a===asig&&p===per)return; // excluir origen
-        targets.push({cId:c.id,asig:a,per:p,label:(c.nombre||c.id)+' · '+a+' · Per.'+p});
+    const subs=c.subjects&&c.subjects.length?c.subjects:[asig];
+    const pers=getPers(c.id)||[];
+    subs.forEach(a=>{
+      pers.forEach(p=>{
+        const pId=String(p.id!==undefined?p.id:p);
+        const key=c.id+'|'+a+'|'+pId;
+        if(seen.has(key))return; seen.add(key);
+        if(c.id===cId&&a===asig&&pId===String(per))return; // excluir origen
+        const pLabel=p.nombre||('Per.'+pId);
+        targets.push({cId:c.id,asig:a,per:pId,
+          label:(c.nombre||c.id)+' · '+a+' · '+pLabel});
       });
     });
   });
   if(!targets.length){
     el.innerHTML='<div style="font-size:13px;color:var(--ink3);text-align:center;padding:12px">No hay otros cursos/asignaturas disponibles.</div>';
   } else {
-    el.innerHTML=targets.map((t,i)=>`
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:8px;border-radius:var(--rs);background:var(--sf2)">
-        <input type="checkbox" id="pxc-copy-cb-${i}" value="${i}" style="flex-shrink:0">
-        <span style="font-size:13px;color:var(--ink)">${esc(t.label)}</span>
-      </label>`).join('');
+    el.innerHTML=targets.map((t,i)=>`<label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:8px;border-radius:var(--rs);background:var(--sf2)">
+      <input type="checkbox" id="pxc-copy-cb-${i}" value="${i}" style="flex-shrink:0">
+      <span style="font-size:13px;color:var(--ink)">${esc(t.label)}</span>
+    </label>`).join('');
   }
-  // Guardar targets para executePxcCopy
   window._pxcCopyTargets=targets;
   document.getElementById('pxc-copy-ov').classList.add('open');
 }
