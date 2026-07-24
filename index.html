@@ -10899,6 +10899,7 @@ function savePxcGrades(){
   }
   studs.forEach(st=>{
     const resp=_pxcBuf[st.id]||{};
+    const hasResp=Object.values(resp).some(v=>v&&v!=='');
     const obt=preguntas.reduce((s,p)=>{
       const sel=resp[String(p.id)];
       if(!sel)return s;
@@ -10906,10 +10907,17 @@ function savePxcGrades(){
       return s+(opt?opt.pts:0);
     },0);
     if(!data.scores[st.id])data.scores[st.id]={};
-    data.scores[st.id]._pxc={resp:{...resp},obt,pos:cfg.total};
-    const prev=data.scores[st.id][act.id]||{};
-    const posToUse=prev.posFixed?prev.pos:cfg.total;
-    data.scores[st.id][act.id]={...prev,obt,pos:posToUse,...(prev.posFixed?{posFixed:true}:{})};
+    if(hasResp){
+      // Tiene respuestas → guardar score
+      data.scores[st.id]._pxc={resp:{...resp},obt,pos:cfg.total};
+      const prev=data.scores[st.id][act.id]||{};
+      const posToUse=prev.posFixed?prev.pos:cfg.total;
+      data.scores[st.id][act.id]={...prev,obt,pos:posToUse,...(prev.posFixed?{posFixed:true}:{})};
+    } else {
+      // Sin respuestas → borrar score para que la planilla muestre —
+      delete data.scores[st.id]._pxc;
+      delete data.scores[st.id][act.id];
+    }
   });
   save();markGrDirty();
   renderGrades();
