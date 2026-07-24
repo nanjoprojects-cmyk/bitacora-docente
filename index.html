@@ -1867,8 +1867,8 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
         <button class="btn sm" onclick="closePxcGrade()">✕</button>
       </div>
       <!-- Tabla de calificaciones -->
-      <div style="flex:1;overflow:auto;min-height:0">
-        <table id="pxc-list" style="width:100%;border-collapse:collapse;font-size:13px"></table>
+      <div id="pxc-list-wrap" style="flex:1;overflow:auto;min-height:0;-webkit-overflow-scrolling:touch">
+        <table id="pxc-list" style="border-collapse:collapse;font-size:12px;min-width:100%"></table>
       </div>
     </div>
   </div>
@@ -10734,15 +10734,21 @@ function renderPxcList(){
   const preguntas=cfg.preguntas.map(pxcMigrateQuestion);
   const total=cfg.total;
 
-  const thS='position:sticky;top:0;background:var(--sf2);padding:6px 8px;border:1px solid var(--br);font-size:11px;font-weight:700;color:var(--ink2);white-space:nowrap;z-index:2';
-  const tdS='padding:4px 5px;border:1px solid var(--br);text-align:center;vertical-align:middle';
+  // ── Layout: tarjetas por estudiante (funciona en web y Android) ──
+  const thC='background:var(--sf2);padding:5px 8px;border:1px solid var(--br);font-size:11px;font-weight:700;color:var(--ink2);white-space:nowrap;text-align:center';
+  const tdC='padding:3px 5px;border:1px solid var(--br);text-align:center;vertical-align:middle;background:var(--sf)';
+  const selS='border:none;background:transparent;font-size:11px;font-weight:700;cursor:pointer;width:100%;text-align:center;padding:2px 0';
 
+  // Encabezado fijo de preguntas
   const thead=`<thead><tr>
-    <th style="${thS};min-width:36px">#</th>
-    <th style="${thS};min-width:150px;text-align:left">Estudiante</th>
-    ${preguntas.map(p=>{const lv=pxcGetLevel(p,total);return `<th style="${thS};color:${lv.color}">P${p.id}</th>`;}).join('')}
-    <th style="${thS}">Pts</th>
-    <th style="${thS}">Nota</th>
+    <th style="${thC};min-width:32px;position:sticky;left:0;z-index:3">#</th>
+    <th style="${thC};min-width:140px;text-align:left;position:sticky;left:32px;z-index:3">Estudiante</th>
+    ${preguntas.map(p=>{
+      const lv=pxcGetLevel(p,total);
+      return `<th style="${thC};color:${lv.color};min-width:70px">P${p.id}<br><span style="font-weight:400;font-size:10px">${p.maxPts}pt</span></th>`;
+    }).join('')}
+    <th style="${thC};min-width:70px">Pts</th>
+    <th style="${thC};min-width:48px">Nota</th>
   </tr></thead>`;
 
   const tbody=studs.map((st,i)=>{
@@ -10753,31 +10759,40 @@ function renderPxcList(){
       const opt=p.opts.find(o=>o.lbl===sel);
       return s+(opt?opt.pts:0);
     },0);
-    const nota=calcNota(obt,total);
-    return `<tr>
-      <td style="${tdS};font-size:11px;color:var(--ink3)">${i+1}</td>
-      <td style="${tdS};text-align:left;font-weight:600;white-space:nowrap">${esc(st.nombre)}</td>
+    // Solo mostrar nota si hay al menos una respuesta seleccionada
+    const hasResp=Object.values(resp).some(v=>v&&v!=='');
+    const nota=hasResp?calcNota(obt,total):null;
+    const rowBg=i%2===0?'var(--sf)':'var(--sf2)';
+    return `<tr style="background:${rowBg}">
+      <td style="${tdC};font-size:11px;color:var(--ink3);font-weight:600;position:sticky;left:0;background:${rowBg};z-index:1">${i+1}</td>
+      <td style="${tdC};text-align:left;font-weight:600;white-space:nowrap;position:sticky;left:32px;background:${rowBg};z-index:1;font-size:12px">${esc(st.nombre)}</td>
       ${preguntas.map(p=>{
         const lv=pxcGetLevel(p,total);
         const sel=resp[String(p.id)]||'';
         const selOpt=sel?p.opts.find(o=>o.lbl===sel):null;
         const selPts=selOpt?selOpt.pts:null;
         const intensity=selPts!==null&&p.maxPts>0?selPts/p.maxPts:0;
-        const bg=selPts===null?'var(--sf)':selPts===0?'var(--sf2)':`rgba(${hexToRgb(lv.bg)},${0.2+intensity*0.8})`;
-        return `<td style="${tdS};background:${bg};padding:2px 4px">
+        const bg=selPts===null?'var(--sf)':selPts===0?'var(--sf2)':`rgba(${hexToRgb(lv.bg)},${0.25+intensity*0.75})`;
+        const tc=sel?lv.color:'var(--ink3)';
+        return `<td style="${tdC};background:${bg};padding:2px 3px">
           <select onchange="pxcSelectOpt('${st.id}',${p.id},this.value)"
-            style="border:none;background:transparent;font-size:11px;font-weight:700;color:${sel?lv.color:'var(--ink3)'};cursor:pointer;width:100%">
+            style="${selS};color:${tc}">
             <option value="">—</option>
-            ${p.opts.map(o=>`<option value="${o.lbl}"${sel===o.lbl?' selected':''}>${o.lbl}${o.pts>0?' ('+o.pts+'pt)':''}</option>`).join('')}
+            ${p.opts.map(o=>`<option value="${o.lbl}"${sel===o.lbl?' selected':''}>${o.lbl}${o.pts>0?' '+o.pts+'p':''}</option>`).join('')}
           </select>
         </td>`;
       }).join('')}
-      <td id="pxco-${st.id}" style="${tdS};font-size:11px;color:var(--ink2);white-space:nowrap">${obt.toFixed(1)}/${total.toFixed(1)}</td>
-      <td id="pxcn-${st.id}" class="pn ${nota!==null?notaCls(nota):'em'}" style="${tdS};font-size:13px;font-weight:700">${nota!==null?nota.toFixed(1):'—'}</td>
+      <td id="pxco-${st.id}" style="${tdC};font-size:11px;color:var(--ink2);white-space:nowrap">${hasResp?obt.toFixed(1)+'/'+total.toFixed(1):'—'}</td>
+      <td id="pxcn-${st.id}" class="pn ${nota!==null?notaCls(nota):'em'}" style="${tdC};font-size:13px;font-weight:700">${nota!==null?nota.toFixed(1):'—'}</td>
     </tr>`;
   }).join('');
 
-  el.innerHTML=thead+'<tbody>'+tbody+'</tbody>';
+  // Contenedor con scroll horizontal explícito
+  el.outerHTML=`<div id="pxc-list-wrap" style="flex:1;overflow:auto;min-height:0;-webkit-overflow-scrolling:touch">
+    <table id="pxc-list" style="border-collapse:collapse;font-size:12px;min-width:100%">
+      ${thead}<tbody>${tbody}</tbody>
+    </table>
+  </div>`;
 }
 
 function hexToRgb(hex){
@@ -10801,11 +10816,12 @@ function pxcSelectOpt(stuId,qId,optLbl){
     const opt=p.opts.find(o=>o.lbl===sel);
     return s+(opt?opt.pts:0);
   },0);
-  const nota=calcNota(obt,cfg.total);
+  const hasResp=Object.values(resp).some(v=>v&&v!=='');
+  const nota=hasResp?calcNota(obt,cfg.total):null;
   const nEl=document.getElementById('pxcn-'+stuId);
   const oEl=document.getElementById('pxco-'+stuId);
   if(nEl){nEl.textContent=nota!==null?nota.toFixed(1):'—';nEl.className='pn '+(nota!==null?notaCls(nota):'em');}
-  if(oEl)oEl.textContent=obt.toFixed(1)+'/'+cfg.total.toFixed(1);
+  if(oEl)oEl.textContent=hasResp?obt.toFixed(1)+'/'+cfg.total.toFixed(1):'—';
 }
 function pxcToggle(stuId,qId){pxcSelectOpt(stuId,qId,'A');}
 function pxcToggleAll(stuId){}
