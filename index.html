@@ -10415,24 +10415,33 @@ function saveActEntry(){
     const prev=data.scores[st.id][actId]||{};
 
     // Detect what actually changed
-    const obtChanged=buf.obt!==''&&Number(buf.obt)!==prev.obt;
-    const obtNew=buf.obt!==''&&prev.obt===undefined;
+    const obtVal=buf.obt!==''&&buf.obt!==null&&buf.obt!==undefined?Number(buf.obt):'';
+    const prevObt=prev.obt!==undefined?prev.obt:'';
+    const obtChanged=obtVal!==''&&obtVal!==prevObt;
+    const obtNew=obtVal!==''&&prevObt==='';
+    // Borrado explícito: usuario vació el campo y había nota previa
+    const obtDeleted=buf.obt===''&&prevObt!==''&&prevObt!==undefined;
     // pos: only write if user explicitly changed it in this session
     const posExplicit=buf.pos!==''&&buf.pos!==undefined&&Number(buf.pos)!==Number(prev.pos||posGlobal);
     const cmtsChanged=buf.comments!==undefined&&
       JSON.stringify(buf.comments)!==JSON.stringify(prev.comments||[]);
 
-    const hasChanges=obtChanged||obtNew||posExplicit||cmtsChanged;
-    // Also preserve students that already have data even if no change
-    const hasExisting=prev.obt!==undefined||prev.comments?.length;
+    const hasChanges=obtChanged||obtNew||obtDeleted||posExplicit||cmtsChanged;
+    const hasExisting=prevObt!==''||prev.comments?.length;
 
-    if(!hasChanges&&!hasExisting) return; // truly empty, skip
-    if(!hasChanges&&hasExisting) return;  // no changes, preserve as-is — DON'T overwrite
+    if(!hasChanges&&!hasExisting) return;
+    if(!hasChanges&&hasExisting) return;
 
     // Build patch — only changed fields
     const patch={};
-    let _deletePos=false; // explicit flag — never confuse "not set" with "set to undefined"
-    if(obtChanged||obtNew) patch.obt=Number(buf.obt);
+    let _deletePos=false;
+    let _deleteObt=false;
+    if(obtDeleted){
+      // Borrado explícito → quitar nota, dejar casilla vacía
+      _deleteObt=true;
+    } else if(obtChanged||obtNew){
+      patch.obt=Number(buf.obt);
+    }
     if(posExplicit){
       patch.pos=Number(buf.pos);
       patch.posFixed=true;
@@ -10451,7 +10460,8 @@ function saveActEntry(){
 
     // Apply patch
     const updated={...prev,...patch};
-    if(_deletePos) delete updated.pos; // only delete when explicitly flagged
+    if(_deletePos) delete updated.pos;
+    if(_deleteObt) delete updated.obt; // borrado explícito → casilla vacía
     data.scores[st.id][actId]=updated;
     saved++;
 
@@ -10495,7 +10505,7 @@ function saveActEntry(){
   var fd2=getGrD(cId,asig,per);
   studs.forEach(function(st){var sc2=(fd2.scores[st.id]||{})[actId]||{};_aeBuf[st.id]={obt:sc2.obt!==undefined&&sc2.obt!==''?String(sc2.obt):'',pos:sc2.pos!==undefined?String(sc2.pos):'',posFixed:!!sc2.posFixed,comments:sc2.comments?JSON.parse(JSON.stringify(sc2.comments)):[]};});
   markGrDirty();renderGrades();renderAeList();
-  toast('Notas guardadas'+(saved<studs.length?' ('+saved+' cambios)':'')+(posGlobalChanged?' - posibles actualizados':''),'s');
+  if(saved===0){toast('Sin cambios nuevos que guardar','s');}else{toast('Notas guardadas'+(saved<studs.length?' ('+saved+' cambios)':'')+(posGlobalChanged?' · posibles actualizados':''),'s');}
 }
 
 // ══════════════════════════════════════════════════════════════
