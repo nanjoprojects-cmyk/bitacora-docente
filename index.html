@@ -37,7 +37,7 @@ body{font-family:'Epilogue',sans-serif;background:var(--bg);color:var(--ink);min
 }
 
 /* TOPBAR */
-.topbar{background:var(--ink);color:#fff;padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;position:fixed;top:0;left:0;right:0;z-index:100;gap:10px;overflow:hidden;min-width:0;}
+.topbar{background:var(--ink);color:#fff;padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;position:fixed;top:0;left:0;right:0;z-index:300;gap:10px;overflow:visible;min-width:0;}
 .tb-brand{display:flex;align-items:center;gap:10px;flex-shrink:1;min-width:0;overflow:hidden;}
 .tb-logo{width:32px;height:32px;background:var(--ac);border-radius:7px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:15px;}
 .tb-title{font-family:'Libre Baskerville',serif;font-size:16px;font-weight:700;}
@@ -139,11 +139,11 @@ td.txt{white-space:pre-wrap;word-break:break-word;line-height:1.5;color:var(--in
 .srch input{background:none;border:none;outline:none;font-family:'Epilogue',sans-serif;font-size:13px;width:100%;padding:0;}
 
 /* OVERLAY / MODAL */
-.ov{position:fixed;inset:0;background:rgba(26,23,20,.65);z-index:200;display:flex;align-items:center;justify-content:center;padding:14px;opacity:0;pointer-events:none;transition:opacity .2s;}
+.ov{position:fixed;inset:0;top:56px;background:rgba(26,23,20,.65);z-index:200;display:flex;align-items:center;justify-content:center;padding:14px;opacity:0;pointer-events:none;transition:opacity .2s;}
 .ov.open{opacity:1;pointer-events:all;}
 .modal{background:var(--sf);border:1px solid var(--br);border-radius:13px;width:100%;max-width:560px;box-shadow:0 20px 60px rgba(0,0,0,.15);transform:translateY(14px) scale(.98);transition:transform .2s;max-height:92vh;overflow-y:auto;}
 /* Bank modals — always full screen, no padding, no rounding */
-.ov.bank-ov{padding:0;align-items:stretch;justify-content:stretch;height:100vh;height:100dvh;}
+.ov.bank-ov{padding:0;align-items:stretch;justify-content:stretch;top:56px!important;height:calc(100vh - 56px);height:calc(100dvh - 56px);}
 .bank-modal{background:var(--sf);border:none;border-radius:0;width:100%;max-width:100%;height:100%;box-shadow:none;display:flex;flex-direction:column;overflow:hidden;}
 .bank-modal .mhdr{flex-shrink:0;}
 .bank-body{flex:1;overflow:hidden;display:flex;flex-direction:column;padding:14px 16px;gap:10px;}
@@ -876,11 +876,11 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
   <div class="tb-right">
     <div style="position:relative">
       <button class="tb-btn" onclick="toggleUndoMenu()" id="btn-undo" disabled title="Deshacer">↩ Deshacer ▾</button>
-      <div id="undo-menu" class="hist-menu" style="display:none;top:40px;left:0"></div>
+      <div id="undo-menu" class="hist-menu" style="display:none;position:fixed;top:56px;left:auto;right:auto"></div>
     </div>
     <div style="position:relative">
       <button class="tb-btn" onclick="toggleRedoMenu()" id="btn-redo" disabled title="Rehacer">↪ Rehacer ▾</button>
-      <div id="redo-menu" class="hist-menu" style="display:none;top:40px;left:0"></div>
+      <div id="redo-menu" class="hist-menu" style="display:none;position:fixed;top:56px;left:auto;right:auto"></div>
     </div>
     <button class="tb-btn" onclick="openHelp()" id="btn-help" title="Ayuda">❓ Ayuda</button>
     <button class="tb-btn" id="btn-fullscreen" onclick="toggleFullscreen()" title="Pantalla completa">⛶</button>
@@ -2449,6 +2449,9 @@ function toggleUndoMenu(){
   const rm=document.getElementById('redo-menu');rm.style.display='none';
   const m=document.getElementById('undo-menu');
   if(m.style.display!=='none'){m.style.display='none';return;}
+  // Posicionar debajo del botón
+  const btn=document.getElementById('btn-undo');
+  if(btn){const r=btn.getBoundingClientRect();m.style.left=r.left+'px';}
   // Build list — most recent first (top of stack = last item)
   const items=[...undoStack].reverse();
   m.innerHTML='<div class="hist-hdr">↩ Selecciona hasta dónde deshacer</div>'+
@@ -2465,6 +2468,9 @@ function toggleRedoMenu(){
   const um=document.getElementById('undo-menu');um.style.display='none';
   const m=document.getElementById('redo-menu');
   if(m.style.display!=='none'){m.style.display='none';return;}
+  // Posicionar debajo del botón
+  const btn=document.getElementById('btn-redo');
+  if(btn){const r=btn.getBoundingClientRect();m.style.left=r.left+'px';}
   const items=[...redoStack].reverse();
   m.innerHTML='<div class="hist-hdr">↪ Selecciona hasta dónde rehacer</div>'+
     items.map((r,i)=>
