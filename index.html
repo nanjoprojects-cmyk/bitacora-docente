@@ -2490,6 +2490,7 @@ function undoTo(toIdx){
   attendance=s.attendance;grades=s.grades;records=s.records;students=s.students;perCfg=s.perCfg;
   if(s.courses)courses=s.courses;
   save(true);renderCurrentPage();
+  _refreshOpenOverlaysAfterUndo();
   const count=removed.length;
   toast('↩ '+(count>1?count+' acciones deshecha(s)':' Deshecho: '+target.label),'s');
   updateUndoRedoBtns();
@@ -2506,6 +2507,7 @@ function redoTo(toIdx){
   attendance=s.attendance;grades=s.grades;records=s.records;students=s.students;perCfg=s.perCfg;
   if(s.courses)courses=s.courses;
   save(true);renderCurrentPage();
+  _refreshOpenOverlaysAfterUndo();
   const count=removed.length;
   toast('↪ '+(count>1?count+' acciones rehecha(s)':' Rehecho: '+target.label),'s');
   updateUndoRedoBtns();
@@ -2513,6 +2515,40 @@ function redoTo(toIdx){
 
 function undoLast(){undoTo(undoStack.length-1);}
 function redoLast(){redoTo(redoStack.length-1);}
+function _refreshOpenOverlaysAfterUndo(){
+  // Si el overlay de actividad está abierto → recargar buffer y lista
+  const aeOv=document.getElementById('act-entry-ov');
+  if(aeOv&&aeOv.classList.contains('open')&&_ae&&_ae.actId){
+    const data=getGrD(_ae.cId,_ae.asig,_ae.per);
+    const studs=getStuDs(_ae.cId,_ae.per);
+    studs.forEach(function(st){
+      const sc=(data.scores[st.id]||{})[_ae.actId]||{};
+      _aeBuf[st.id]={
+        obt:sc.obt!==undefined&&sc.obt!==''?String(sc.obt):'',
+        pos:sc.pos!==undefined?String(sc.pos):'',
+        posFixed:!!sc.posFixed,
+        comments:sc.comments?JSON.parse(JSON.stringify(sc.comments)):[]
+      };
+    });
+    renderAeList&&renderAeList();
+  }
+  // Si el overlay PxC de calificación está abierto → recargar buffer y lista
+  const pxcOv=document.getElementById('pxc-grade-ov');
+  if(pxcOv&&pxcOv.classList.contains('open')&&_pxc&&_pxc.cId){
+    const data=getGrD(_pxc.cId,_pxc.asig,_pxc.per);
+    const studs=getStuDs(_pxc.cId,_pxc.per);
+    studs.forEach(function(st){
+      const sc=(data.scores[st.id]||{})._pxc||{};
+      if(sc.resp&&Array.isArray(sc.resp)){
+        const obj={};sc.resp.forEach(function(id){obj[String(id)]='A';});
+        _pxcBuf[st.id]=obj;
+      } else {
+        _pxcBuf[st.id]=sc.resp?JSON.parse(JSON.stringify(sc.resp)):{};
+      }
+    });
+    renderPxcList&&renderPxcList();
+  }
+}
 function renderCurrentPage(){
   const a=document.querySelector('.page.on');if(!a)return;
   const id=a.id.replace('page-','');
