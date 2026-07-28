@@ -2287,7 +2287,7 @@ function showTipoHelp(){
 // ══════════════════════════
 let profile={},courses=[],records=[],students={},attendance={},grades={},perCfg={},syncCfg={},voicesCfg={};
 let curView='GENERAL',editRec=null,editCourse=null,confCb=null;
-let srch='',fTipo='',fAsig='',fPer='',sCol='fecha',sDir='desc';
+let srch='',fTipo='',fAsig='',fPer='',fCurso='',sCol='fecha',sDir='desc';
 let cSubs=[],cCol=PAL[0];
 let editEstId=null,editEstC=null,editEstP=null;
 let curPillar='saber';
@@ -2703,7 +2703,7 @@ function showPage(p){
 // BITÁCORA
 // ══════════════════════════
 function setView(v){
-  curView=v;srch='';fTipo='';fAsig='';fPer='';
+  curView=v;srch='';fTipo='';fAsig='';fPer='';fCurso='';
   sessionStorage.setItem('bda_last_page','bitacora');
   showPage('bitacora');
   document.querySelectorAll('.ni').forEach(x=>x.classList.remove('on'));
@@ -2714,6 +2714,7 @@ function getFiltered(){
   let d=[...records];
   if(curView!=='GENERAL'&&curView!=='pending')d=d.filter(r=>r.cursoId===curView);
   if(curView==='pending')d=d.filter(r=>r.estado==='Pendiente');
+  if(fCurso&&(curView==='GENERAL'||curView==='pending'))d=d.filter(r=>r.cursoId===fCurso);
   if(srch){const q=srch.toLowerCase();d=d.filter(r=>((r.desc||'')+(r.obs||'')+(r.asig||'')).toLowerCase().includes(q));}
   if(fTipo)d=d.filter(r=>r.tipo===fTipo);
   if(fAsig)d=d.filter(r=>r.asig===fAsig);
@@ -2819,6 +2820,15 @@ function renderB(){
     '<div class="stat"><div class="stat-l">⏳ Pendientes</div><div class="stat-v" style="color:var(--am)">'+pend+'</div></div>'+
     '<div class="stat"><div class="stat-l">🟠 Imprevistos</div><div class="stat-v" style="color:var(--am)">'+imprev+'</div></div>'+
     '</div>'+
+    // Selector de curso — solo en Vista General y Pendientes
+    (isG?'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+
+      '<span style="font-size:11px;color:var(--ink3);font-weight:600">Curso:</span>'+
+      '<select style="font-size:12px;border:1px solid var(--br);border-radius:var(--rs);padding:4px 8px;background:var(--sf);color:var(--ink);cursor:pointer"'+
+        ' onchange="fCurso=this.value;renderB()">'+
+        '<option value="">Todos los cursos</option>'+
+        courses.map(c=>'<option value="'+c.id+'"'+(fCurso===c.id?' selected':'')+'>'+esc(c.nombre)+(c.grado?' — '+esc(c.grado):'')+' </option>').join('')+
+      '</select>'+
+      '</div>':'')+
     '<div class="chips"><span style="font-size:11px;color:var(--ink3);font-weight:600">Tipo:</span>'+
     '<span class="chip '+(fTipo===''?'on':'')+'" onclick="fTipo=\'\';renderB()">Todos</span>'+
     tipos.map(t=>{const def=TIPOS_DEF[t];const emoji=def?def.emoji:'';return'<span class="chip '+(fTipo===t?'on':'')+'" onclick="fTipo=\''+t+'\';renderB()">'+emoji+' '+t+'</span>';}).join('')+
