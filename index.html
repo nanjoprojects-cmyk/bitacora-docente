@@ -2353,12 +2353,14 @@ function fillGlobalPerSel(){
   const el=document.getElementById('mdia-per-global');if(!el)return;
   // Unión de períodos únicos por nombre (para cursos con mismos períodos)
   const seen=new Set();
+  // Auto-detectar si no hay selección manual
+  const autoGlobal=_globalPer||getAutoActivePer(courses[0]?.id||'');
   const opts=['<option value="">— Seleccionar período —</option>'];
   courses.forEach(c=>{
     getPers(c.id).forEach(p=>{
       if(!seen.has(p.id)){
         seen.add(p.id);
-        opts.push('<option value="'+p.id+'"'+(p.id===_globalPer?' selected':'')+'>'+esc(p.nombre)+'</option>');
+        opts.push('<option value="'+p.id+'"'+(p.id===autoGlobal?' selected':'')+'>'+esc(p.nombre)+'</option>');
       }
     });
   });
@@ -4641,6 +4643,32 @@ function applyPerTemplate(selectedOnly){
   renderPerEditor();
   toast('Períodos aplicados a '+targets.length+' curso(s) ✅','s');
 }
+// Detectar el período activo de un curso basado en la fecha de hoy
+function getAutoActivePer(cId){
+  const today=new Date().toISOString().slice(0,10); // YYYY-MM-DD
+  const ps=getPers(cId);
+  const active=ps.find(p=>p.inicio&&p.fin&&today>=p.inicio&&today<=p.fin);
+  return active?active.id:null;
+}
+
+// Al arrancar: si no hay período manual, detectar automáticamente
+function autoSetGlobalPer(){
+  // Si el usuario ya eligió un período manualmente, respetarlo
+  if(_globalPer)return;
+  const today=new Date().toISOString().slice(0,10);
+  // Buscar en todos los cursos el período que contiene la fecha de hoy
+  for(const c of courses){
+    const ps=getPers(c.id);
+    const active=ps.find(p=>p.inicio&&p.fin&&today>=p.inicio&&today<=p.fin);
+    if(active){
+      _globalPer=active.id;
+      localStorage.setItem(SK_GLOBAL_PER,active.id);
+      break;
+    }
+  }
+}
+
+
 function getPers(cId){
   // Course-specific config takes priority
   if(perCfg[cId]&&perCfg[cId].length) return perCfg[cId];
@@ -4659,8 +4687,10 @@ function fillPerSel(selId,cId){
   const el=document.getElementById(selId);if(!el)return;
   const prev=el.value,ps=getPers(cId);
   el.innerHTML=ps.map(p=>'<option value="'+p.id+'">'+esc(p.nombre)+'</option>').join('');
-  // Prioridad: período global → valor previo → primero de la lista
+  // Prioridad: período global → auto-detección por fecha → valor previo → primero
+  const autoP=getAutoActivePer(cId);
   const preferred=(_globalPer&&ps.find(p=>p.id===_globalPer))?_globalPer:
+                  (autoP&&ps.find(p=>p.id===autoP))?autoP:
                   (prev&&ps.find(p=>p.id===prev))?prev:
                   ps[0]?.id||'';
   if(preferred)el.value=preferred;
@@ -11586,6 +11616,7 @@ function closeWelcome(){
 
 function _initMain(skip){
   startTopbarClock();
+  autoSetGlobalPer(); // detectar período activo por fecha
   renderTP();renderSB();renderTbAvatar();restoreSidebarState();
   fillGlobalPerSel(); // poblar selector de período global en Mi Día
   // Restore last active section if tab was suspended (sessionStorage survives suspension but not close)
