@@ -10229,11 +10229,13 @@ function removeRecovery(cId,asig,per,stuId,actId){
 // ACTIVITY ENTRY MODAL
 // ══════════════════════════════════════════
 let _ae={actId:'',cId:'',asig:'',per:'',focusStuId:null};
+let _aeModoNota=false;
 // Temporary score buffer while modal is open
 let _aeBuf={};
 
 function openActEntry(actId,cId,asig,per,focusStuId){
   _ae={actId,cId,asig,per,focusStuId:focusStuId||null};
+  _aeModoNota=false;
   const data=getGrD(cId,asig,per);
   const act=data.activities.find(a=>a.id===actId);
   if(!act)return;
@@ -10963,12 +10965,8 @@ function renderPxcList(){
     </tr>`;
   }).join('');
 
-  // Contenedor con scroll horizontal explícito
-  el.outerHTML=`<div id="pxc-list-wrap" style="flex:1;overflow:auto;min-height:0;-webkit-overflow-scrolling:touch">
-    <table id="pxc-list" style="border-collapse:collapse;font-size:12px;min-width:100%">
-      ${thead}<tbody>${tbody}</tbody>
-    </table>
-  </div>`;
+  // Actualizar la tabla sin reemplazar el contenedor
+  el.innerHTML = thead + '<tbody>' + tbody + '</tbody>';
 }
 
 function hexToRgb(hex){
