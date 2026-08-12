@@ -1769,6 +1769,11 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
         <span style="font-size:12px;color:var(--ink3)">Puntos posibles:</span>
         <input autocomplete="off" id="ae-pos" type="number" min="0" step="0.5" readonly onclick="this.removeAttribute('readonly');" style="width:60px;font-size:14px;font-weight:700;text-align:center;border-radius:var(--rs);border:1px solid var(--br);padding:4px 6px;cursor:pointer">
         <span style="font-size:11px;color:var(--ink3)">(obt/pos)×4+1</span>
+        <button id="ae-modo-btn" onclick="toggleAeModo()"
+          style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--br);background:var(--sf);color:var(--ink2);cursor:pointer;font-weight:600"
+          title="Alternar entre ingresar puntos obtenidos o nota directa">
+          📝 Modo: Pts
+        </button>
         <input autocomplete="off" id="ae-global-date" type="date" style="font-size:12px;padding:4px 7px;border-radius:var(--rs);border:1px solid var(--br);background:var(--sf);color:var(--ink)">
         <input autocomplete="off" id="ae-global-desc" type="text" placeholder="📝 Descripción / comentario global…" style="flex:1;min-width:140px;font-size:12px;padding:5px 9px;border-radius:var(--rs);border:1px solid var(--br);background:var(--sf);color:var(--ink)">
         <button class="btn sm" onclick="aeApplyGlobalDesc()" title="Asignar comentario global a entradas sin comentario">📋</button>
@@ -1777,8 +1782,8 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
       </div>
       <!-- Fila: aplicar misma nota a todos -->
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--acl);border-radius:var(--rs);padding:8px 12px;border:1px solid rgba(45,91,227,.15)">
-        <span style="font-size:12px;color:var(--ac);font-weight:600">✏️ Nota para todos:</span>
-        <span style="font-size:11px;color:var(--ink3)">Pts obtenidos:</span>
+        <span style="font-size:12px;color:var(--ac);font-weight:600">✏️ Aplicar a todos:</span>
+        <span id="ae-global-lbl" style="font-size:11px;color:var(--ink3)">Pts obtenidos:</span>
         <input autocomplete="off" id="ae-global-obt" type="number" min="0" step="0.5"
           placeholder="0"
           style="width:64px;font-size:14px;font-weight:700;text-align:center;border-radius:var(--rs);border:1px solid var(--br);padding:4px 6px;background:var(--sf);color:var(--ink)"
@@ -2225,7 +2230,7 @@ const SK_ATT_LOCK='bda_att_lock';
 let attReverse=false;
 let attLock=false;
 const PAL=['#2D5BE3','#6D28D9','#1E7A4A','#B45309','#C0392B','#0891B2','#BE185D','#059669','#92400E','#374151'];
-const TNEXT={'':'P','P':'A','A':'T','T':'J','J':'P'};
+const TNEXT={'':'P','P':'A','A':'T','T':'J','J':''}; // ciclo: —→P→A→T→J→—
 const DEFSEM=[
   {id:'SEM1',nombre:'Semestre 1',inicio:'2026-01-01',fin:'2026-06-30',weight:50},
   {id:'SEM2',nombre:'Semestre 2',inicio:'2026-07-01',fin:'2026-11-30',weight:50}
@@ -3044,7 +3049,7 @@ function renderAtt(){
       const dateLbl=(v==='A'||v==='T'||v==='J')
         ?'<span class="att-date-lbl state-'+v+'">'+fmtS(d)+'</span>'
         :'';
-      cells+='<td class="atd-cell'+(cls?' '+cls:'')+(isActive?' att-col-active':'')+(isLocked?' att-col-locked':'')+'" data-dcol="'+d+'"><button class="at-btn '+v+'" data-att="'+cId+'~'+asig+'~'+per+'~'+st.id+'~'+d+'" onclick="toggleAtt(\''+cId+'\',\''+esc(asig)+'\',\''+per+'\',\''+st.id+'\',\''+d+'\')">  '+(v||'·')+'</button>'+dateLbl+noteBtn+'</td>';
+      cells+='<td class="atd-cell'+(cls?' '+cls:'')+(isActive?' att-col-active':'')+(isLocked?' att-col-locked':'')+'" data-dcol="'+d+'"><button class="at-btn '+v+'" data-att="'+cId+'~'+asig+'~'+per+'~'+st.id+'~'+d+'" onclick="toggleAtt(\''+cId+'\',\''+esc(asig)+'\',\''+per+'\',\''+st.id+'\',\''+d+'\')" oncontextmenu="return clearAtt(\''+cId+'\',\''+esc(asig)+'\',\''+per+'\',\''+st.id+'\',\''+d+'\',event)" title="Clic: cambiar estado | Clic derecho / mantener: limpiar">  '+(v||'·')+'</button>'+dateLbl+noteBtn+'</td>';
     });
     const pctStr=stats.tot>0?(stats.pct*100).toFixed(0)+'%':'—';
     const pctCol=stats.pct>=.9?'var(--gr)':stats.pct>=.75?'var(--ac)':stats.pct>=.6?'var(--am)':'var(--rd)';
@@ -3081,6 +3086,46 @@ function renderAtt(){
   content.innerHTML=bulkBar+'<div class="att-wrap"><table class="att-tbl"><thead>'+thead+'</thead><tbody>'+tbody+remRow+'</tbody></table></div>';
   renderAttBanner();
 }
+
+// Limpiar celda de asistencia directamente a — (clic derecho / long press)
+function clearAtt(cId,asig,per,stuId,date,e){
+  if(e){e.preventDefault();e.stopPropagation();}
+  if(attLock){
+    const activeDate=document.getElementById('bulk-date')?.value||'';
+    if(date!==activeDate) return false;
+  }
+  const data=getAttD(cId,asig,per);
+  if(!data.records[stuId])data.records[stuId]={};
+  const prev=data.records[stuId][date]||'';
+  if(prev==='') return false; // ya está vacío
+  // Si J con nota, pedir confirmación
+  if(prev==='J'){
+    const note=(data.notes&&data.notes[stuId]&&data.notes[stuId][date])||'';
+    if(note){
+      if(!confirm('Esta celda tiene una nota guardada:\n\n"'+note+'"\n\n¿Desea limpiar la celda y eliminar la nota?')) return false;
+      if(data.notes&&data.notes[stuId]) delete data.notes[stuId][date];
+    }
+  }
+  pushUndo('Limpiar asistencia '+fmtS(date));
+  data.records[stuId][date]='';
+  localStorage.setItem(SK.a,JSON.stringify(attendance));
+  markAttDirty();
+  // Actualizar botón visualmente
+  const key=cId+'~'+asig+'~'+per+'~'+stuId+'~'+date;
+  const btn=document.querySelector('[data-att="'+key+'"]');
+  if(btn){
+    btn.className='at-btn';
+    btn.textContent='·';
+    const cell=btn.parentElement;
+    cell.querySelector('.att-comment-btn')?.remove();
+    cell.querySelector('.att-date-lbl')?.remove();
+    updateAttStats(cId,asig,per,stuId);
+  } else {
+    renderAtt();
+  }
+  return false;
+}
+
 
 function toggleAtt(cId,asig,per,stuId,date){
   // Guard: if lock is active, only allow editing the selected date
@@ -7349,7 +7394,7 @@ const HELP_SECTIONS=[
       <div class="help-card">
         <div class="help-step"><span class="help-num">1</span><div><strong>Configure su perfil</strong><br>Vaya a <em>⚙️ Configuración → Perfil</em> e ingrese su nombre, institución y año lectivo.</div></div>
         <div class="help-step"><span class="help-num">2</span><div><strong>Cree sus cursos</strong><br>En <em>⚙️ Configuración → Cursos</em> agregue cada grupo a cargo con su nombre, grado y asignaturas.</div></div>
-        <div class="help-step"><span class="help-num">3</span><div><strong>Configure los períodos</strong><br>En <em>⚙️ Configuración → Períodos</em> defina la plantilla de períodos (inicio, fin, nombre). Use <strong>Aplicar a todos</strong> para asignarla a todos los cursos, o seleccione cursos específicos. Para grados 12 o 13 use el botón <strong>Modo semestral</strong> (2 semestres). Las fechas afectan directamente los registros de asistencia.</div></div>
+        <div class="help-step"><span class="help-num">3</span><div><strong>Configure los períodos</strong><br>En <em>⚙️ Configuración → Períodos</em> defina la plantilla de períodos con nombre, fecha de inicio y fecha de fin. Use <strong>Aplicar a todos</strong> para asignarla a todos los cursos. Para grados semestrales use el botón <strong>Modo semestral</strong> (2 semestres). <strong>Importante:</strong> al ingresar las fechas de inicio y fin, la app detecta automáticamente el período activo al abrir — así no necesita seleccionarlo manualmente cada vez, ni en cursos por períodos ni en cursos semestrales.</div></div>
         <div class="help-step"><span class="help-num">4</span><div><strong>Agregue estudiantes</strong><br>En <em>⚙️ Configuración → Estudiantes</em> seleccione el curso y período, y agregue los estudiantes uno a uno o en lote (pegando una lista). También puede subir una foto de perfil desde <em>⚙️ Configuración → Perfil</em>.</div></div>
         <div class="help-step"><span class="help-num">5</span><div><strong>Configure sus horarios</strong><br>En <em>⚙️ Configuración → Horarios</em> defina los tipos de horario (A, B, C, Especial) con sus espacios y tiempos. Use <strong>＋ Nuevo tipo</strong> para crear un horario adicional (ej. Sábado) y eliminarlo cuando no lo necesite. En <em>Asignación Semanal</em> use <strong>＋ Sábado</strong> o <strong>＋ Domingo</strong> si trabaja esos días.</div></div>
         <div class="help-step"><span class="help-num">6</span><div><strong>¡Listo para usar!</strong><br>Cada mañana abra <em>🕐 Mi Día</em>, seleccione el tipo de horario y navegue directamente a cada clase.</div></div>
@@ -7382,7 +7427,7 @@ const HELP_SECTIONS=[
         <div class="help-step"><span class="help-num">＋</span><div><strong>Nuevo registro</strong><br>Haga clic en el botón <em>＋ Registro</em> o en el nombre del curso en la barra lateral. Complete la fecha, curso, asignatura, tipo de clase, descripción y estado.</div></div>
         <div class="help-step"><span class="help-num">📂</span><div><strong>Tipos de registro en la bitácora</strong><br>Al seleccionar el tipo de registro aparece una descripción de ayuda bajo el selector. Los cinco tipos son: <strong>🟢 Clase</strong> — actividad académica ejecutada con normalidad. <strong>🟣 Evento institucional</strong> — actividad del colegio que reemplazó la clase (izada, semana temática, proyecto). <strong>🟠 Imprevisto externo</strong> — situación fuera del control del docente (paro sindical, corte de servicios, visita no anunciada). <strong>🔵 Novedad de aula</strong> — algo interno alteró la dinámica de la clase (grupo incompleto, evaluación de otra área, problema de disciplina). <strong>🟡 Ausencia docente</strong> — el docente no pudo asistir por permiso, incapacidad, calamidad o comisión.</div></div>
         <div class="help-step"><span class="help-num">📊</span><div><strong>Resumen comparativo de registros</strong><br>El botón <em>📊 Resumen</em> en la barra superior muestra un panel con la distribución de todos los registros por tipo: un gráfico circular global y barras apiladas por curso. Permite visualizar de un vistazo cuántas clases se ejecutaron, cuántos imprevistos hubo y cuáles cursos tuvieron más interrupciones.</div></div>
-        <div class="help-step"><span class="help-num">🗂</span><div><strong>Vista General</strong><br>Muestra todos los registros ordenados por fecha. Use el buscador y los filtros para encontrar registros específicos.</div></div>
+        <div class="help-step"><span class="help-num">🗂</span><div><strong>Vista General</strong><br>Muestra todos los registros de todos los cursos ordenados por fecha. Use el <strong>selector de curso</strong> para filtrar por un curso específico. Combine también con los filtros de Tipo y Período para búsquedas precisas. El buscador de texto libre filtra simultáneamente en descripción, observaciones y asignatura.</div></div>
         <div class="help-step"><span class="help-num">📚</span><div><strong>Vista por curso</strong><br>Haga clic en el nombre de un curso en la barra lateral para ver solo sus registros.</div></div>
         <div class="help-step"><span class="help-num">⏳</span><div><strong>Pendientes</strong><br>Los registros marcados como "Pendiente" aparecen aquí para hacer seguimiento.</div></div>
         <div class="help-step"><span class="help-num">↩</span><div><strong>Deshacer / Rehacer</strong><br>Use los botones en la barra superior para revertir cambios. Haga clic en la flecha ▾ para ver el historial y escoger hasta qué punto deshacer.</div></div>
@@ -7397,7 +7442,7 @@ const HELP_SECTIONS=[
       <p>Registre la asistencia de cada clase por curso, asignatura y período.</p>
       <div class="help-card">
         <div class="help-step"><span class="help-num">📅</span><div><strong>Agregar una fecha</strong><br>Seleccione el curso, asignatura y período, luego haga clic en <em>＋ Fecha</em> y elija el día de clase.</div></div>
-        <div class="help-step"><span class="help-num">✅</span><div><strong>Marcar asistencia</strong><br>En la planilla, haga clic en la celda de cada estudiante para cambiar su estado: <strong>P</strong> (Presente), <strong>A</strong> (Ausente), <strong>T</strong> (Tarde), <strong>J</strong> (Justificado).</div></div>
+        <div class="help-step"><span class="help-num">✅</span><div><strong>Marcar asistencia</strong><br>Haga clic en la celda de cada estudiante para avanzar en el ciclo de estados: <strong>— → P → A → T → J → —</strong>. Los estados son: <strong>P</strong> (Presente), <strong>A</strong> (Ausente), <strong>T</strong> (Tarde), <strong>J</strong> (Justificado), <strong>—</strong> (sin registro). Para <strong>limpiar una celda directamente</strong> a — sin pasar por todos los estados, use <em>clic derecho</em> en PC o <em>mantener presionado</em> en tablet.</div></div>
         <div class="help-step"><span class="help-num">📊</span><div><strong>Estadísticas automáticas</strong><br>La planilla calcula automáticamente totales, porcentaje de asistencia y nota de asistencia por estudiante.</div></div>
         <div class="help-step"><span class="help-num">🗑</span><div><strong>Eliminar una fecha</strong><br>Use el botón <em>✕</em> en el encabezado de la columna. La app pedirá confirmación antes de borrar.</div></div>
         <div class="help-step"><span class="help-num">💾</span><div><strong>Guardar</strong><br>Haga clic en <em>Guardar asistencia</em> cuando termine. El indicador naranja avisa si hay cambios sin guardar.</div></div>
@@ -7429,10 +7474,14 @@ const HELP_SECTIONS=[
         <div class="help-step"><span class="help-num">📥</span><div><strong>Importar actividad desde otro curso</strong><br>Al crear una nueva actividad, despliegue el panel <em>📥 Importar datos desde otra actividad</em>. Seleccione el curso origen (los que comparten la misma asignatura aparecen primero), la asignatura y la actividad deseada. Al pulsar <em>↓ Traer datos</em> se rellenan automáticamente todos los campos del formulario, que puede ajustar antes de guardar.</div></div>
         <div class="help-step"><span class="help-num">📌</span><div><strong>Indicador de evaluación</strong><br>Al crear o editar una actividad puede ingresar un <em>Indicador de evaluación</em> redactado en infinitivo (ej: «resolver ecuaciones de primer grado»). Este indicador se usa automáticamente para generar la <em>Voz del Desempeño</em> en el informe de cada estudiante.</div></div>
         <div class="help-step"><span class="help-num">💬</span><div><strong>Descripción de actividad</strong><br>Haga clic en el ícono 💬 en el encabezado de cualquier actividad para ver o editar su descripción.</div></div>
-        <div class="help-step"><span class="help-num">✏️</span><div><strong>Ingresar notas</strong><br>Haga clic en la celda de cada estudiante y escriba los puntos obtenidos. La nota se calcula automáticamente.</div></div>
+        <div class="help-step"><span class="help-num">✏️</span><div><strong>Ingresar notas</strong><br>Haga clic en la celda de cada estudiante y escriba los puntos obtenidos. La nota se calcula automáticamente con la fórmula <em>(obt/pos)×4+1</em>.</div></div>
+        <div class="help-step"><span class="help-num">🎯</span><div><strong>Modo nota directa</strong><br>Si ya tiene las notas calculadas (ej: registros en papel) y quiere ingresarlas directamente sin calcular puntos, pulse el botón <strong>📝 Modo: Pts</strong> en la barra superior de la ventana de notas. Cambiará a <strong>🎯 Modo: Nota</strong> y podrá digitar la nota (1.0–5.0) directamente. El sistema calcula y guarda los puntos obtenidos automáticamente usando la inversa de la fórmula: <em>obt = (nota−1)×pos÷4</em>. El campo muestra en pequeño los puntos equivalentes para que pueda verificar. Pulse el botón nuevamente para volver al modo de puntos.</div></div>
         <div class="help-step"><span class="help-num">📋</span><div><strong>Resumen</strong><br>La pestaña <em>Resumen</em> muestra la nota definitiva de cada estudiante con el cálculo ponderado de los cuatro pilares.</div></div>
         <div class="help-step"><span class="help-num">💾</span><div><strong>Guardar</strong><br>Use <em>Guardar calificaciones</em>. El indicador naranja avisa si hay cambios pendientes.</div></div>
         <div class="help-step"><span class="help-num">📋</span><div><strong>Planilla Definitiva</strong><br>La pestaña <em>Planilla Definitiva</em> muestra el promedio acumulado de cada pilar, su aporte ponderado y la nota final en tiempo real. Mientras no estén registradas todas las actividades, la nota aparece como <em>parcial</em>.</div></div>
+        <div class="help-step"><span class="help-num">🎯</span><div><strong>Prueba por Competencias (PxC)</strong><br>El pilar PxC (10%) cuenta con un sistema propio de calificación. Primero pulse <em>📝 Configurar PxC</em> para definir las preguntas: cada pregunta tiene hasta <strong>4 opciones (A, B, C, D)</strong> con puntaje independiente. El mayor puntaje de cada pregunta define su máximo. El nivel de dificultad (Básico → Reto) se sugiere automáticamente según el peso relativo de la pregunta, pero puede ajustarlo manualmente.</div></div>
+        <div class="help-step"><span class="help-num">📊</span><div><strong>Calificar PxC</strong><br>Pulse <em>🎯 Calificar</em> para abrir la tabla de calificación. Cada fila es un estudiante; cada columna una pregunta (P1, P2…). Seleccione en el desplegable la opción que marcó cada estudiante (A, B, C, D o —). La nota y los puntos se actualizan en tiempo real. Si una estudiante no responde ninguna pregunta, la casilla queda en <strong>—</strong> (sin nota).</div></div>
+        <div class="help-step"><span class="help-num">📋</span><div><strong>Copiar PxC a otros cursos</strong><br>Desde <em>📝 Configurar PxC</em> pulse <em>📋 Copiar a cursos…</em> para aplicar la misma configuración de preguntas a otros cursos/asignaturas/períodos. Seleccione los destinos con las casillas y pulse <em>Copiar a seleccionados</em>.</div></div>
         <div class="help-step"><span class="help-num">🔀</span><div><strong>Modo evaluación por parciales</strong><br>Para cursos semestrales, active <em>"Evaluación con parciales"</em> en ⚙️ Config → Cursos al crear o editar el curso. Esto reemplaza PxC por <strong>Parcial 1 (30%)</strong> y <strong>Parcial 3 (30%)</strong>; SABER+HACER+SER quedan en el 40% restante. Las pestañas cambian automáticamente al seleccionar ese curso.</div></div>
         <div class="help-step"><span class="help-num">💬</span><div><strong>Comentarios en notas individuales</strong><br>En cada celda de calificación aparece un pequeño ícono 💬 debajo del número. Haga clic para agregar un comentario sobre esa nota para ese estudiante específico (ej: "Entregó tarde", "Excelente presentación"). El comentario se guarda con fecha y aparece en el Informe de Desempeño de la ficha del estudiante. El ícono se vuelve azul cuando hay un comentario.</div></div>
       </div>
@@ -7459,13 +7508,15 @@ const HELP_SECTIONS=[
   {
     icon:'☁️',title:'Sincronización',
     content:`
-      <h3>Respaldo en la nube</h3>
-      <p>La sincronización permite mantener sus datos actualizados entre PC y Tablet de forma automática.</p>
+      <h3>Respaldo en Google Drive</h3>
+      <p>Sus datos se guardan automáticamente en su <strong>Google Drive</strong> personal. La sincronización funciona entre PC y Tablet usando la misma cuenta de Google.</p>
       <div class="help-card">
-        <div class="help-step"><span class="help-num">1</span><div><strong>Obtener su URL</strong><br>La URL de sincronización es suministrada por <strong>Nanjo Projects</strong> al adquirir la licencia. Si no la ha recibido, escriba a <em>nanjoprojects@gmail.com</em>.</div></div>
-        <div class="help-step"><span class="help-num">2</span><div><strong>Configurar en la app</strong><br>Vaya a <em>⚙️ Configuración → ☁️ Sincronización</em>, pegue la URL en el campo correspondiente y haga clic en <em>Guardar y conectar</em>.</div></div>
-        <div class="help-step"><span class="help-num">3</span><div><strong>Vincular la Tablet</strong><br>Repita el mismo paso en su Tablet: abra la app, complete el asistente, elija <em>Tablet</em> e ingrese la misma URL. Sus datos se cargarán automáticamente.</div></div>
-        <div class="help-step"><span class="help-num">☁️</span><div><strong>Sincronización automática</strong><br>Cada vez que guarde cambios, la app los enviará automáticamente a la nube después de 2.5 segundos. En la Tablet, toque <em>⬇ Traer datos</em> antes de comenzar a trabajar.</div></div>
+        <div class="help-step"><span class="help-num">1</span><div><strong>Conectar Google Drive</strong><br>Al ingresar por primera vez, la app le pedirá que inicie sesión con su cuenta de Google. Haga clic en <em>Conectar con Google</em> y autorice el acceso. Sus datos quedarán guardados en una carpeta llamada <strong>Bitacora Docente</strong> en su Drive.</div></div>
+        <div class="help-step"><span class="help-num">2</span><div><strong>Sincronización automática</strong><br>Cada vez que guarde cambios, la app los envía automáticamente al Drive en 2.5 segundos. El indicador ☁️ en la barra superior muestra el estado: <em>sincronizando</em>, <em>al día</em> o <em>error</em>.</div></div>
+        <div class="help-step"><span class="help-num">3</span><div><strong>Usar en otro dispositivo</strong><br>Abra la app en otro dispositivo (PC, tablet, etc.) e inicie sesión con <strong>la misma cuenta de Google</strong>. Sus datos se cargarán automáticamente desde el Drive al detectar el archivo de respaldo.</div></div>
+        <div class="help-step"><span class="help-num">⬇</span><div><strong>Traer datos manualmente</strong><br>Si necesita forzar la carga desde el Drive (ej: otro dispositivo actualizó los datos), vaya a <em>⚙️ Configuración → ☁️ Sincronización</em> y pulse <em>⬇ Traer datos</em>. Si hay conflicto entre datos locales y del Drive, la app le preguntará cuáles conservar.</div></div>
+        <div class="help-step"><span class="help-num">📁</span><div><strong>Archivo en Drive</strong><br>Sus datos se guardan como <em>bitacora_docente_backup.json</em> dentro de la carpeta <em>Bitacora Docente</em> en su Google Drive. No elimine ni mueva esta carpeta.</div></div>
+        <div class="help-step"><span class="help-num">🔒</span><div><strong>Seguridad</strong><br>La app solo accede a su propia carpeta de datos. No puede leer ni modificar otros archivos de su Drive. Sus datos académicos son privados y solo usted tiene acceso.</div></div>
       </div>
     `
   },
@@ -7500,8 +7551,11 @@ const HELP_SECTIONS=[
         <div class="help-step"><span class="help-num">💾</span><div><strong>Respaldo completo (JSON)</strong><br>Use el botón <em>💾 Respaldo JSON</em> para descargar <strong>todos sus datos</strong>: perfil, cursos, estudiantes, asistencia, calificaciones, bitácora, horarios y configuración de sincronización. Guarde este archivo en un lugar seguro.</div></div>
         <div class="help-step"><span class="help-num">📂</span><div><strong>Restaurar desde respaldo</strong><br>Use <em>📂 Restaurar</em> y seleccione un archivo de respaldo JSON previamente descargado. <strong>Atención:</strong> esto reemplazará todos los datos actuales.</div></div>
       </div>
+        <div class="help-step"><span class="help-num">🔄</span><div><strong>Inicializar año académico</strong><br>Al terminar el año, vaya a <em>⚙️ Configuración → 🔄 Año Académico</em>. El proceso tiene tres pasos: (1) <strong>Crear respaldo</strong> del año actual — se guarda en Drive como <em>bitacora_respaldo_2024-2025.json</em> y puede descargarse localmente; (2) <strong>Elegir qué hacer con los estudiantes</strong> — promoverlos al siguiente nivel (se conservan en los cursos) o borrar los listados para cargar nuevos; (3) <strong>Ejecutar</strong> — limpia todas las notas, asistencia, actividades y seguimiento, conservando perfil, cursos, horarios y asignación.</div></div>
+        <div class="help-step"><span class="help-num">📂</span><div><strong>Consultar años anteriores</strong><br>En la misma sección <em>🔄 Año Académico</em>, el panel <em>Respaldos anteriores</em> lista todos los archivos de respaldo guardados en Drive. Desde la versión web puede abrirlos en modo de solo lectura para consultar datos de años pasados.</div></div>
+      </div>
       <div style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);border-radius:var(--rs);padding:10px 14px;font-size:12px;color:#B91C1C;margin-top:12px">
-        ⚠️ <strong>Recomendación:</strong> realice un respaldo JSON antes de cambiar de dispositivo o navegador, ya que los datos se almacenan localmente.
+        ⚠️ <strong>Recomendación:</strong> cree siempre el respaldo de año académico <strong>antes</strong> de ejecutar la inicialización. Esta acción no se puede deshacer.
       </div>
     `
   },
@@ -7548,7 +7602,7 @@ const TOUR_STEPS=[
   {icon:'✅',title:'Controle la asistencia',body:'Agregue fechas de clase y marque la asistencia de cada estudiante. La app calcula estadísticas automáticamente.'},
   {icon:'📊',title:'Gestione las calificaciones',body:'Organice sus notas en cuatro pilares: SABER, HACER, SER y Prueba por Competencias. La nota definitiva se calcula sola.'},
   {icon:'📝',title:'Seguimiento de estudiantes',body:'Haga clic en el ícono 📝 junto a cualquier estudiante para registrar observaciones y llamados de atención con seguimiento de estado.'},
-    {icon:'💾',title:'Respalde su información',body:'Use Exportar → Respaldo JSON para guardar todos sus datos. Recuerde hacerlo regularmente para no perder información.'},
+    {icon:'☁️',title:'Sincronización automática',body:'Sus datos se guardan automáticamente en Google Drive. Al abrir la app en otro dispositivo con la misma cuenta de Google, sus datos se cargan solos. Para respaldar el año académico use Configuración → Año Académico.'},
 ];
 
 let tourStep=0;
@@ -10251,6 +10305,35 @@ function closeActEntry(){
   _aeBuf={};
 }
 
+function toggleAeModo(){
+  _aeModoNota=!_aeModoNota;
+  const btn=document.getElementById('ae-modo-btn');
+  const lbl=document.getElementById('ae-global-lbl');
+  const gObt=document.getElementById('ae-global-obt');
+  if(btn){
+    btn.textContent=_aeModoNota?'🎯 Modo: Nota':'📝 Modo: Pts';
+    btn.style.background=_aeModoNota?'var(--acl)':'var(--sf)';
+    btn.style.color=_aeModoNota?'var(--ac)':'var(--ink2)';
+    btn.style.borderColor=_aeModoNota?'var(--ac)':'var(--br)';
+  }
+  if(lbl) lbl.textContent=_aeModoNota?'Nota directa (1.0-5.0):':'Pts obtenidos:';
+  if(gObt){
+    gObt.step=_aeModoNota?'0.1':'0.5';
+    gObt.min=_aeModoNota?'1':'0';
+    gObt.max=_aeModoNota?'5':'';
+    gObt.placeholder=_aeModoNota?'1.0':'0';
+    gObt.value='';
+  }
+  renderAeList();
+}
+function aeNota2Obt(nota, pos){
+  // Inversa de (obt/pos)×4+1 = nota → obt = (nota-1)×pos/4
+  return Math.max(0, Math.round(((nota-1)*pos/4)*100)/100);
+}
+function aeObt2Nota(obt, pos){
+  if(!pos||pos===0||obt==='')return null;
+  return Math.round(calcNota(obt,pos)*10)/10;
+}
 function renderAeList(){
   const{cId,asig,per,actId}=_ae;
   const data=getGrD(cId,asig,per);
@@ -10292,14 +10375,14 @@ function renderAeList(){
         <button class="btn xs" onclick="aeSetPts('${st.id}')" title="Ingresar valor exacto" style="opacity:.6">✎</button>
       </div>`:`
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <label style="font-size:11px;color:var(--ink3)">Obt:</label>
-        <input class="ae-obt pi" type="number" min="0" step="0.5" autocomplete="off"
-          value="${buf.obt}" placeholder="0"
-          style="width:70px;font-size:14px;font-weight:700;text-align:center;cursor:pointer"
+        <label style="font-size:11px;color:var(--ink3)">${_aeModoNota?'Nota:':'Obt:'}</label>
+        <input class="ae-obt pi" type="number" min="${_aeModoNota?1:0}" max="${_aeModoNota?5:''}" step="${_aeModoNota?0.1:0.5}" autocomplete="off"
+          value="${_aeModoNota?(buf.obt!==''&&posEff!==''?aeObt2Nota(buf.obt,posEff)||'':''):buf.obt}" placeholder="${_aeModoNota?'1.0':'0'}"
+          style="width:70px;font-size:14px;font-weight:700;text-align:center;cursor:pointer;${_aeModoNota?'border-color:var(--ac);background:var(--acl);':''}"
           readonly onclick="this.removeAttribute('readonly');this.focus();this.select();"
           oninput="aeUpdate('${st.id}',this.value)"
           onkeydown="if(event.key==='Enter'||event.key==='ArrowDown'){event.preventDefault();aeNextStudent('${st.id}');}if(event.key==='ArrowUp'){event.preventDefault();aePrevStudent('${st.id}');}">
-        <span style="font-size:12px;color:var(--ink3)">/</span>
+        ${_aeModoNota?'<span style="font-size:11px;color:var(--ac)">→ '+(buf.obt!==''&&posEff!==''?buf.obt+' pts':'...pts')+'</span>':'<span style="font-size:12px;color:var(--ink3)">/</span>'}
         <input type="number" min="0" step="0.5" autocomplete="off"
           value="${buf.posFixed?buf.pos:(posGlobal||act?.posibles||'')}" placeholder="${posGlobal||act?.posibles||'?'}"
           title="${buf.posFixed?'Pts posibles fijos para este estudiante (toca para cambiar)':'Pts posibles — toca para fijar individualmente'}"
@@ -10332,7 +10415,18 @@ function renderAeList(){
 
 function aeUpdate(stuId,val){
   if(!_aeBuf[stuId])return;
-  _aeBuf[stuId].obt=val===''?'':parseFloat(val);
+  if(_aeModoNota&&val!==''){
+    // Convertir nota directa a puntos obtenidos
+    const data=getGrD(_ae.cId,_ae.asig,_ae.per);
+    const act=data.activities.find(a=>a.id===_ae.actId)||{};
+    const buf=_aeBuf[stuId];
+    const posEff=buf.pos!==''?Number(buf.pos):(parseFloat(document.getElementById('ae-pos')?.value)||act?.posibles||0);
+    if(posEff>0){
+      _aeBuf[stuId].obt=aeNota2Obt(parseFloat(val),posEff);
+    }
+  } else {
+    _aeBuf[stuId].obt=val===''?'':parseFloat(val);
+  }
   const data=getGrD(_ae.cId,_ae.asig,_ae.per);
   const act=data.activities.find(a=>a.id===_ae.actId)||{};
   const isBanco=act.actType==='banco';
@@ -11382,18 +11476,18 @@ function renderAnioPanel(){
     <div class="card" style="margin-bottom:12px">
       <div class="card-t">2️⃣ ¿Qué hacer con los estudiantes?</div>
       <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
-        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:12px;border:2px solid var(--br);border-radius:var(--rs);transition:.1s" id="anio-op-prom-card" onclick="anioSelOp('promover')">
-          <input type="radio" name="anio-op" value="promover" checked style="margin-top:2px;flex-shrink:0">
-          <div>
-            <div style="font-weight:700;font-size:13px">Promover estudiantes al siguiente nivel</div>
-            <div style="font-size:12px;color:var(--ink3);margin-top:3px">Los estudiantes se conservan en sus cursos. Deberás editar manualmente el grado de cada curso desde <strong>Configuración → Cursos</strong>.</div>
+        <label style="display:flex;align-items:center;gap:12px;cursor:pointer;padding:14px 16px;border:2px solid var(--br);border-radius:var(--rs);transition:border-color .1s;background:var(--sf)" id="anio-op-prom-card" onclick="anioSelOp('promover')">
+          <input type="radio" name="anio-op" value="promover" checked style="flex-shrink:0;width:16px;height:16px;accent-color:var(--ac)">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:13px;color:var(--ink)">🎓 Promover estudiantes al siguiente nivel</div>
+            <div style="font-size:12px;color:var(--ink3);margin-top:3px;line-height:1.5">Los estudiantes se conservan en sus cursos. Edita manualmente el grado de cada curso desde <strong>Configuración → Cursos</strong>.</div>
           </div>
         </label>
-        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:12px;border:2px solid var(--br);border-radius:var(--rs);transition:.1s" id="anio-op-borr-card" onclick="anioSelOp('borrar')">
-          <input type="radio" name="anio-op" value="borrar" style="margin-top:2px;flex-shrink:0">
-          <div>
-            <div style="font-weight:700;font-size:13px">Borrar listados de estudiantes</div>
-            <div style="font-size:12px;color:var(--ink3);margin-top:3px">Los cursos se conservan vacíos. Deberás cargar los nuevos listados de estudiantes.</div>
+        <label style="display:flex;align-items:center;gap:12px;cursor:pointer;padding:14px 16px;border:2px solid var(--br);border-radius:var(--rs);transition:border-color .1s;background:var(--sf)" id="anio-op-borr-card" onclick="anioSelOp('borrar')">
+          <input type="radio" name="anio-op" value="borrar" style="flex-shrink:0;width:16px;height:16px;accent-color:var(--ac)">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:13px;color:var(--ink)">🗑 Borrar listados de estudiantes</div>
+            <div style="font-size:12px;color:var(--ink3);margin-top:3px;line-height:1.5">Los cursos se conservan vacíos. Deberás cargar los nuevos listados de estudiantes.</div>
           </div>
         </label>
       </div>
