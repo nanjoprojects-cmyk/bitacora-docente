@@ -1872,8 +1872,8 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
         <button class="btn sm" onclick="closePxcGrade()">✕</button>
       </div>
       <!-- Tabla de calificaciones -->
-      <div id="pxc-list-wrap" style="flex:1;overflow:auto;min-height:0;-webkit-overflow-scrolling:touch">
-        <table id="pxc-list" style="border-collapse:collapse;font-size:12px;min-width:100%"></table>
+      <div id="pxc-list-wrap" style="flex:1;overflow:auto;min-height:0;-webkit-overflow-scrolling:touch;margin-right:32px">
+        <table id="pxc-list" style="border-collapse:collapse;font-size:12px;min-width:100%;width:max-content"></table>
       </div>
     </div>
   </div>
@@ -10987,51 +10987,48 @@ function renderPxcList(){
   }).join('');
 
   // Índice alfabético lateral
-  const letterIdx=`<div id="pxc-letter-idx" style="position:absolute;right:0;top:56px;bottom:0;width:22px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1px;z-index:10;background:var(--sf);border-left:1px solid var(--br);overflow:hidden">
-    ${letters.map(l=>`<button onclick="pxcScrollToLetter('${l}')" style="width:18px;height:18px;font-size:9px;font-weight:700;border:none;background:transparent;color:var(--ac);cursor:pointer;border-radius:3px;padding:0;line-height:1;flex-shrink:0" title="${l}">${l}</button>`).join('')}
+  const letterIdx=`<div id="pxc-letter-idx" style="position:absolute;right:0;top:0;bottom:0;width:32px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:2px;z-index:20;background:var(--sf);border-left:1px solid var(--br);overflow-y:auto;padding:4px 0">
+    ${letters.map(l=>`<button onclick="pxcScrollToLetter('${l}')" style="width:26px;min-height:22px;font-size:11px;font-weight:700;border:none;background:transparent;color:var(--ac);cursor:pointer;border-radius:4px;padding:2px 0;line-height:1;flex-shrink:0;touch-action:manipulation" title="Ir a ${l}">${l}</button>`).join('')}
   </div>`;
 
   // Actualizar la tabla sin reemplazar el contenedor
   el.innerHTML = thead + '<tbody>' + tbody + '</tbody>';
 
-  // Agregar índice al wrapper si no existe
-  const wrap=document.getElementById('pxc-list-wrap');
-  if(wrap){
-    wrap.style.position='relative';
-    wrap.style.paddingRight='22px';
-    const old=document.getElementById('pxc-letter-idx');
-    if(old)old.remove();
-    wrap.insertAdjacentHTML('beforeend',letterIdx);
+  // Índice lateral — fuera del wrapper de tabla para no romper el layout
+  // Se ancla dentro del bank-ov como overlay absoluto
+  const old=document.getElementById('pxc-letter-idx');
+  if(old)old.remove();
+  const ov=document.getElementById('pxc-grade-ov');
+  if(ov){
+    ov.insertAdjacentHTML('beforeend',letterIdx);
+    // Scroll del índice actúa sobre el wrapper, no el ov
+    window._pxcWrap=document.getElementById('pxc-list-wrap');
   }
 }
 
 // Activar fila y mostrar watermarks
 function pxcActivateRow(tr, stuId){
-  // Desactivar fila previa
   const prev=document.querySelector('[data-pxc-stu].pxc-row-active');
+  // Siempre limpiar la fila previa completamente
   if(prev){
     prev.classList.remove('pxc-row-active');
     prev.querySelectorAll('.pxc-wm').forEach(el=>el.style.opacity='0');
+    prev.style.outline='';
+    prev.style.outlineOffset='';
   }
-  if(prev===tr)return; // toggle off
+  if(prev===tr)return; // toggle off al tocar la misma fila
   // Activar nueva fila
   tr.classList.add('pxc-row-active');
   tr.querySelectorAll('.pxc-wm').forEach(el=>el.style.opacity='0.45');
   tr.style.outline='2px solid var(--ac)';
   tr.style.outlineOffset='-2px';
-  // Cuando se desactiva quitar outline
-  const clearOutline=()=>{
-    if(!tr.classList.contains('pxc-row-active')) tr.style.outline='';
-  };
-  setTimeout(clearOutline, 100);
 }
 
 // Scroll a primera letra
 function pxcScrollToLetter(letter){
   const tr=document.querySelector('[data-pxc-stu][data-letter="'+letter+'"]');
   if(!tr)return;
-  const wrap=document.getElementById('pxc-list-wrap');
-  if(wrap) wrap.scrollTop=tr.offsetTop - wrap.offsetTop - 40;
+  tr.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 function hexToRgb(hex){
