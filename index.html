@@ -3127,7 +3127,7 @@ function clearAtt(cId,asig,per,stuId,date,e){
 }
 
 
-function toggleAtt(cId,asig,per,stuId,date){
+const toggleAtt=_db(function(cId,asig,per,stuId,date){
   // Guard: if lock is active, only allow editing the selected date
   if(attLock){
     const activeDate=document.getElementById('bulk-date')?.value||'';
@@ -3190,7 +3190,7 @@ function toggleAtt(cId,asig,per,stuId,date){
   } else {
     renderAtt(); // fallback
   }
-}
+});
 
 function toggleAttReverse(){
   attReverse=!attReverse;
@@ -10444,7 +10444,7 @@ function aeUpdate(stuId,val){
   const el=document.getElementById('ae-nota-'+stuId);
   if(el){el.textContent=nota!==null?nota.toFixed(1):'—';el.className='pn '+(nota!==null?notaCls(nota):(isBanco?'lo':'em'));}
 }
-function aeAdjust(stuId,delta){
+const aeAdjust=_dbFast(function(stuId,delta){
   // Increment/decrement points for banco-type activities
   if(!_aeBuf[stuId])return;
   const data=getGrD(_ae.cId,_ae.asig,_ae.per);
@@ -10462,7 +10462,7 @@ function aeAdjust(stuId,delta){
     const ptLabel=row.querySelector('.ae-banco-pts');
     if(ptLabel)ptLabel.textContent='Pts: '+(pts>0?'+':'')+pts+' / máx '+maxPts;
   }
-}
+});
 function aeSetPts(stuId){
   // Allow exact value entry for banco type
   const cur=_aeBuf[stuId]?.obt!==''?Number(_aeBuf[stuId].obt):0;
@@ -11622,6 +11622,31 @@ function executePxcCopy(){
   document.getElementById('pxc-copy-ov').classList.remove('open');
   toast('✅ Configuración PxC copiada a '+copied+' curso(s)','s');
 }
+
+// ── Debouncer anti-doble-pulsación (Android WebView) ──
+// Previene que un toque registre múltiples acciones
+const _DB_DELAY=300; // ms mínimo entre acciones
+let _dbLastT=0;
+function _db(fn){
+  return function(){
+    const now=Date.now();
+    if(now-_dbLastT<_DB_DELAY)return;
+    _dbLastT=now;
+    return fn.apply(this,arguments);
+  };
+}
+// Debounce rápido para acciones repetibles (+1 banco)
+const _DB_FAST=80;
+let _dbFastT=0;
+function _dbFast(fn){
+  return function(){
+    const now=Date.now();
+    if(now-_dbFastT<_DB_FAST)return;
+    _dbFastT=now;
+    return fn.apply(this,arguments);
+  };
+}
+
 
 function init(skip){
   loadScheduleData();loadSeg();load();rebuildMdiaTipoSel();
