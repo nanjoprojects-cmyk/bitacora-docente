@@ -10366,15 +10366,21 @@ function renderAeList(){
         <button class="btn xs danger" onclick="aeDelCmt('${st.id}',${ci})" style="padding:1px 4px;opacity:.6;flex-shrink:0">✕</button>
       </div>`).join('')}
     </div>`:'';
+    // Barra de progreso banco
+    const bancoPct=pts!==null&&maxPtsBanco>0?Math.min(100,Math.round(pts/maxPtsBanco*100)):0;
+    const barColor=nota===null?'var(--br)':nota>=4.5?'#2E7D52':nota>=4.0?'#5C8A2E':nota>=3.5?'#7D6B12':nota>=3.0?'#7D4912':'#8B2D27';
     const inputArea=isBanco?`
       <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
-        <span style="font-size:11px;color:var(--ink3)">Pts: <strong>${pts>0?'+':''}${pts}</strong> / máx ${maxPtsBanco}</span>
+        <span class="ae-banco-pts" style="font-size:11px;color:var(--ink3)">Pts: <strong>${pts!==null?(pts>0?'+':'')+pts:'—'}</strong> / máx ${maxPtsBanco}</span>
         <button class="btn xs" style="opacity:.65" onclick="aeAdjust('${st.id}',0)">+0</button>
         <button class="btn xs" onclick="aeAdjust('${st.id}',1)">+1</button>
         <button class="btn xs" onclick="aeAdjust('${st.id}',2)">+2</button>
         <button class="btn xs" onclick="aeAdjust('${st.id}',3)">+3</button>
         <button class="btn xs danger" onclick="aeAdjust('${st.id}',-1)" style="opacity:.7">−1</button>
         <button class="btn xs" onclick="aeSetPts('${st.id}')" title="Ingresar valor exacto" style="opacity:.6">✎</button>
+      </div>
+      <div style="margin-top:6px;height:5px;background:var(--br);border-radius:3px;overflow:hidden" title="${bancoPct}% — ${pts!==null?pts:'0'} de ${maxPtsBanco} pts">
+        <div id="ae-bar-${st.id}" style="height:100%;width:${bancoPct}%;background:${barColor};border-radius:3px;transition:width .25s,background .25s"></div>
       </div>`:`
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <label style="font-size:11px;color:var(--ink3)">${_aeModoNota?'Nota:':'Obt:'}</label>
@@ -10461,6 +10467,16 @@ const aeAdjust=_dbFast(function(stuId,delta){
     const pts=Number(_aeBuf[stuId].obt);
     const ptLabel=row.querySelector('.ae-banco-pts');
     if(ptLabel)ptLabel.textContent='Pts: '+(pts>0?'+':'')+pts+' / máx '+maxPts;
+    // Actualizar barra de progreso
+    const barEl=row.querySelector('[id^="ae-bar-"]');
+    if(barEl&&maxPts>0){
+      const pct=Math.min(100,Math.round(pts/maxPts*100));
+      const nota2=calcNotaBanco(pts,maxPts);
+      const bc=nota2===null?'var(--br)':nota2>=4.5?'#2E7D52':nota2>=4.0?'#5C8A2E':nota2>=3.5?'#7D6B12':nota2>=3.0?'#7D4912':'#8B2D27';
+      barEl.style.width=pct+'%';
+      barEl.style.background=bc;
+      if(barEl.parentElement)barEl.parentElement.title=pct+'% — '+pts+' de '+maxPts+' pts';
+    }
   }
 });
 function aeSetPts(stuId){
