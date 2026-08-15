@@ -1871,9 +1871,10 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
         <button class="btn sm primary" onclick="savePxcGrades()">💾 Guardar notas</button>
         <button class="btn sm" onclick="closePxcGrade()">✕</button>
       </div>
-      <!-- Tabla de calificaciones -->
-      <div id="pxc-list-wrap" style="flex:1;overflow:auto;min-height:0;-webkit-overflow-scrolling:touch;margin-right:32px">
-        <table id="pxc-list" style="border-collapse:collapse;font-size:12px;min-width:100%;width:max-content"></table>
+      <!-- Alpha + student list -->
+      <div style="display:flex;gap:6px;flex:1;overflow:hidden">
+        <div class="bank-alpha" id="pxc-alpha"></div>
+        <div class="bank-students" id="pxc-list"></div>
       </div>
     </div>
   </div>
@@ -10707,6 +10708,7 @@ function saveActEntry(){
 // ══════════════════════════════════════════════════════════════
 let _pxc={cId:'',asig:'',per:''}; // active context
 let _pxcBuf={}; // {stuId: Set of question ids marked correct}
+let _pxcDirty=false;
 
 // ── Config helpers ──
 function openPxcConfig(cId,asig,per){
@@ -10859,6 +10861,7 @@ function savePxcConfig(){
 // ── Grading ──
 function openPxcGrade(cId,asig,per){
   _pxc={cId,asig,per};
+  _pxcDirty=false;
   const data=getGrD(cId,asig,per);
   const cfg=data.pxcConfig;
   if(!cfg){toast('Configura la prueba primero con 📝 Configurar PxC','e');return;}
@@ -10886,8 +10889,12 @@ function openPxcGrade(cId,asig,per){
 }
 
 function closePxcGrade(){
+  if(_pxcDirty){
+    if(!confirm('Tienes cambios sin guardar en la calificación PxC.\n\n¿Salir sin guardar?'))return;
+  }
   document.getElementById('pxc-grade-ov').classList.remove('open');
   _pxcBuf={};
+  _pxcDirty=false;
 }
 
 // ── PxC level system ──
@@ -11092,6 +11099,7 @@ function hexToRgb(hex){
 }
 
 function pxcSelectOpt(stuId,qId,optLbl){
+  _pxcDirty=true;
   if(!_pxcBuf[stuId])_pxcBuf[stuId]={};
   const key=String(qId);
   if(!optLbl||optLbl===null){delete _pxcBuf[stuId][key];}
@@ -11132,6 +11140,7 @@ function pxcSelectOpt(stuId,qId,optLbl){
 function pxcToggle(stuId,qId){pxcSelectOpt(stuId,qId,'A');}
 function pxcToggleAll(stuId){}
 function pxcMarkAll(correct){
+  _pxcDirty=true;
   const cfg=getGrD(_pxc.cId,_pxc.asig,_pxc.per).pxcConfig;
   if(!cfg)return;
   const studs=getStuDs(_pxc.cId,_pxc.per);
