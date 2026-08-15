@@ -10945,6 +10945,9 @@ function renderPxcList(){
     <th style="${thC};min-width:48px">Nota</th>
   </tr></thead>`;
 
+  // Índice alfabético — letras presentes en los estudiantes
+  const letters=[...new Set(studs.map(st=>st.nombre.trim()[0]?.toUpperCase()||''))].sort();
+
   const tbody=studs.map((st,i)=>{
     const resp=_pxcBuf[st.id]||{};
     const obt=preguntas.reduce((s,p)=>{
@@ -10953,11 +10956,12 @@ function renderPxcList(){
       const opt=p.opts.find(o=>o.lbl===sel);
       return s+(opt?opt.pts:0);
     },0);
-    // Solo mostrar nota si hay al menos una respuesta seleccionada
     const hasResp=Object.values(resp).some(v=>v&&v!=='');
     const nota=hasResp?calcNota(obt,total):null;
     const rowBg=i%2===0?'var(--sf)':'var(--sf2)';
-    return `<tr style="background:${rowBg}">
+    const firstLetter=st.nombre.trim()[0]?.toUpperCase()||'';
+    return `<tr data-pxc-stu="${st.id}" data-letter="${firstLetter}" style="background:${rowBg};cursor:pointer"
+      onclick="pxcActivateRow(this,'${st.id}')">
       <td style="${tdC};font-size:11px;color:var(--ink3);font-weight:600;position:sticky;left:0;background:${rowBg};z-index:1">${i+1}</td>
       <td style="${tdC};text-align:left;font-weight:600;white-space:nowrap;position:sticky;left:32px;background:${rowBg};z-index:1;font-size:12px">${esc(st.nombre)}</td>
       ${preguntas.map(p=>{
@@ -10968,7 +10972,8 @@ function renderPxcList(){
         const intensity=selPts!==null&&p.maxPts>0?selPts/p.maxPts:0;
         const bg=selPts===null?'var(--sf)':selPts===0?'var(--sf2)':`rgba(${hexToRgb(lv.bg)},${0.25+intensity*0.75})`;
         const tc=sel?lv.color:'var(--ink3)';
-        return `<td style="${tdC};background:${bg};padding:2px 3px">
+        return `<td id="pxc-td-${st.id}-${p.id}" style="${tdC};background:${bg};padding:2px 3px;position:relative">
+          <span class="pxc-wm" style="position:absolute;left:2px;top:50%;transform:translateY(-50%);font-size:9px;font-weight:700;color:var(--ink3);opacity:0;pointer-events:none;transition:opacity .15s;user-select:none">P${p.id}</span>
           <select onchange="pxcSelectOpt('${st.id}',${p.id},this.value)"
             style="${selS};color:${tc}">
             <option value="">—</option>
@@ -10981,8 +10986,52 @@ function renderPxcList(){
     </tr>`;
   }).join('');
 
+  // Índice alfabético lateral
+  const letterIdx=`<div id="pxc-letter-idx" style="position:absolute;right:0;top:56px;bottom:0;width:22px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1px;z-index:10;background:var(--sf);border-left:1px solid var(--br);overflow:hidden">
+    ${letters.map(l=>`<button onclick="pxcScrollToLetter('${l}')" style="width:18px;height:18px;font-size:9px;font-weight:700;border:none;background:transparent;color:var(--ac);cursor:pointer;border-radius:3px;padding:0;line-height:1;flex-shrink:0" title="${l}">${l}</button>`).join('')}
+  </div>`;
+
   // Actualizar la tabla sin reemplazar el contenedor
   el.innerHTML = thead + '<tbody>' + tbody + '</tbody>';
+
+  // Agregar índice al wrapper si no existe
+  const wrap=document.getElementById('pxc-list-wrap');
+  if(wrap){
+    wrap.style.position='relative';
+    wrap.style.paddingRight='22px';
+    const old=document.getElementById('pxc-letter-idx');
+    if(old)old.remove();
+    wrap.insertAdjacentHTML('beforeend',letterIdx);
+  }
+}
+
+// Activar fila y mostrar watermarks
+function pxcActivateRow(tr, stuId){
+  // Desactivar fila previa
+  const prev=document.querySelector('[data-pxc-stu].pxc-row-active');
+  if(prev){
+    prev.classList.remove('pxc-row-active');
+    prev.querySelectorAll('.pxc-wm').forEach(el=>el.style.opacity='0');
+  }
+  if(prev===tr)return; // toggle off
+  // Activar nueva fila
+  tr.classList.add('pxc-row-active');
+  tr.querySelectorAll('.pxc-wm').forEach(el=>el.style.opacity='0.45');
+  tr.style.outline='2px solid var(--ac)';
+  tr.style.outlineOffset='-2px';
+  // Cuando se desactiva quitar outline
+  const clearOutline=()=>{
+    if(!tr.classList.contains('pxc-row-active')) tr.style.outline='';
+  };
+  setTimeout(clearOutline, 100);
+}
+
+// Scroll a primera letra
+function pxcScrollToLetter(letter){
+  const tr=document.querySelector('[data-pxc-stu][data-letter="'+letter+'"]');
+  if(!tr)return;
+  const wrap=document.getElementById('pxc-list-wrap');
+  if(wrap) wrap.scrollTop=tr.offsetTop - wrap.offsetTop - 40;
 }
 
 function hexToRgb(hex){
@@ -11012,6 +11061,21 @@ function pxcSelectOpt(stuId,qId,optLbl){
   const oEl=document.getElementById('pxco-'+stuId);
   if(nEl){nEl.textContent=nota!==null?nota.toFixed(1):'—';nEl.className='pn '+(nota!==null?notaCls(nota):'em');}
   if(oEl)oEl.textContent=hasResp?obt.toFixed(1)+'/'+cfg.total.toFixed(1):'—';
+  // Actualizar color de celda en tiempo real
+  const tdEl=document.getElementById('pxc-td-'+stuId+'-'+qId);
+  if(tdEl){
+    const pDef=preguntas.find(q=>String(q.id)===String(qId));
+    if(pDef){
+      const lv=pxcGetLevel(pDef,cfg.total);
+      const selOpt=optLbl?pDef.opts.find(o=>o.lbl===optLbl):null;
+      const selPts=selOpt?selOpt.pts:null;
+      const intensity=selPts!==null&&pDef.maxPts>0?selPts/pDef.maxPts:0;
+      const bg=selPts===null?'var(--sf)':selPts===0?'var(--sf2)':`rgba(${hexToRgb(lv.bg)},${0.25+intensity*0.75})`;
+      tdEl.style.background=bg;
+      const selEl=tdEl.querySelector('select');
+      if(selEl)selEl.style.color=optLbl?lv.color:'var(--ink3)';
+    }
+  }
 }
 function pxcToggle(stuId,qId){pxcSelectOpt(stuId,qId,'A');}
 function pxcToggleAll(stuId){}
