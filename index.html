@@ -10927,139 +10927,120 @@ function renderPxcList(){
   if(!el||!cfg)return;
   const preguntas=cfg.preguntas.map(pxcMigrateQuestion);
   const total=cfg.total;
-  const isAndroid=typeof AndroidDrive!=='undefined';
+
+  // ── Layout: tarjetas por estudiante (funciona en web y Android) ──
+  const thC='background:var(--sf2);padding:5px 8px;border:1px solid var(--br);font-size:11px;font-weight:700;color:var(--ink2);white-space:nowrap;text-align:center';
+  const tdC='padding:3px 5px;border:1px solid var(--br);text-align:center;vertical-align:middle;background:var(--sf)';
+  const selS='border:none;background:transparent;font-size:11px;font-weight:700;cursor:pointer;width:100%;text-align:center;padding:2px 0';
+
+  // Encabezado fijo de preguntas
+  const thead=`<thead><tr>
+    <th style="${thC};min-width:32px;position:sticky;left:0;z-index:3">#</th>
+    <th style="${thC};min-width:140px;text-align:left;position:sticky;left:32px;z-index:3">Estudiante</th>
+    ${preguntas.map(p=>{
+      const lv=pxcGetLevel(p,total);
+      return `<th style="${thC};color:${lv.color};min-width:70px">P${p.id}<br><span style="font-weight:400;font-size:10px">${p.maxPts}pt</span></th>`;
+    }).join('')}
+    <th style="${thC};min-width:70px">Pts</th>
+    <th style="${thC};min-width:48px">Nota</th>
+  </tr></thead>`;
+
+  // Índice alfabético — letras presentes en los estudiantes
   const letters=[...new Set(studs.map(st=>st.nombre.trim()[0]?.toUpperCase()||''))].sort();
 
-  if(isAndroid){
-    // ── Android: DIV grid (evita bug overflow+flex+table en WebView) ──
-    const nQ=preguntas.length;
-    const colW=[30,130,...preguntas.map(()=>62),60,42];
-    const totalW=colW.reduce((a,b)=>a+b,0);
-    const gridCols=colW.map(w=>w+'px').join(' ');
-    const hdrStyle='background:var(--sf2);padding:5px 4px;border:1px solid var(--br);font-size:10px;font-weight:700;color:var(--ink2);text-align:center;display:flex;align-items:center;justify-content:center;flex-direction:column;overflow:hidden';
-    const cellStyle='padding:2px 2px;border:1px solid var(--br);text-align:center;display:flex;align-items:center;justify-content:center;background:var(--sf);overflow:hidden;position:relative';
-    const selS='border:none;background:transparent;font-size:10px;font-weight:700;cursor:pointer;width:100%;text-align:center;padding:1px 0';
+  // position:sticky en <td> no funciona en Android WebView — deshabilitar
+  const isAndroid=typeof AndroidDrive!=='undefined';
+  const stickyNo=isAndroid?'':'position:sticky;';
+  const thead2=isAndroid?`<thead><tr>
+    <th style="${thC};min-width:32px">#</th>
+    <th style="${thC};min-width:140px;text-align:left">Estudiante</th>
+    ${preguntas.map(p=>{const lv=pxcGetLevel(p,total);return `<th style="${thC};color:${lv.color};min-width:70px">P${p.id}<br><span style="font-weight:400;font-size:10px">${p.maxPts}pt</span></th>`;}).join('')}
+    <th style="${thC};min-width:70px">Pts</th>
+    <th style="${thC};min-width:48px">Nota</th>
+  </tr></thead>`:thead;
 
-    let rows=`<div style="display:grid;grid-template-columns:${gridCols};width:${totalW}px;position:sticky;top:0;z-index:5">
-      <div style="${hdrStyle}">#</div>
-      <div style="${hdrStyle};text-align:left;justify-content:flex-start">Estudiante</div>
-      ${preguntas.map(p=>{const lv=pxcGetLevel(p,total);return`<div style="${hdrStyle};color:${lv.color}">P${p.id}<br><span style="font-weight:400;font-size:9px">${p.maxPts}pt</span></div>`;}).join('')}
-      <div style="${hdrStyle}">Pts</div>
-      <div style="${hdrStyle}">Nota</div>
-    </div>`;
-
-    rows+=studs.map((st,i)=>{
-      const resp=_pxcBuf[st.id]||{};
-      const obt=preguntas.reduce((s,p)=>{
-        const sel=resp[String(p.id)];if(!sel)return s;
-        const opt=p.opts.find(o=>o.lbl===sel);return s+(opt?opt.pts:0);
-      },0);
-      const hasResp=Object.values(resp).some(v=>v&&v!=='');
-      const nota=hasResp?calcNota(obt,total):null;
-      const rowBg=i%2===0?'var(--sf)':'var(--sf2)';
-      const fl=st.nombre.trim()[0]?.toUpperCase()||'';
-      const qCells=preguntas.map(p=>{
+  const tbody=studs.map((st,i)=>{
+    const resp=_pxcBuf[st.id]||{};
+    const obt=preguntas.reduce((s,p)=>{
+      const sel=resp[String(p.id)];
+      if(!sel)return s;
+      const opt=p.opts.find(o=>o.lbl===sel);
+      return s+(opt?opt.pts:0);
+    },0);
+    const hasResp=Object.values(resp).some(v=>v&&v!=='');
+    const nota=hasResp?calcNota(obt,total):null;
+    const rowBg=i%2===0?'var(--sf)':'var(--sf2)';
+    const firstLetter=st.nombre.trim()[0]?.toUpperCase()||'';
+    return `<tr data-pxc-stu="${st.id}" data-letter="${firstLetter}" style="background:${rowBg};cursor:pointer"
+      onclick="pxcActivateRow(this,'${st.id}')">
+      <td style="${tdC};font-size:11px;color:var(--ink3);font-weight:600;${stickyNo}left:0;background:${rowBg};z-index:1">${i+1}</td>
+      <td style="${tdC};text-align:left;font-weight:600;white-space:nowrap;${stickyNo}left:32px;background:${rowBg};z-index:1;font-size:12px">${esc(st.nombre)}</td>
+      ${preguntas.map(p=>{
         const lv=pxcGetLevel(p,total);
         const sel=resp[String(p.id)]||'';
         const selOpt=sel?p.opts.find(o=>o.lbl===sel):null;
         const selPts=selOpt?selOpt.pts:null;
         const intensity=selPts!==null&&p.maxPts>0?selPts/p.maxPts:0;
-        const bg=selPts===null?rowBg:selPts===0?'var(--sf2)':`rgba(${hexToRgb(lv.bg)},${0.25+intensity*0.75})`;
+        const bg=selPts===null?'var(--sf)':selPts===0?'var(--sf2)':`rgba(${hexToRgb(lv.bg)},${0.25+intensity*0.75})`;
         const tc=sel?lv.color:'var(--ink3)';
-        return`<div id="pxc-td-${st.id}-${p.id}" style="${cellStyle};background:${bg}">
-          <span class="pxc-wm" style="position:absolute;left:2px;font-size:8px;font-weight:700;color:var(--ink3);opacity:0;pointer-events:none">P${p.id}</span>
-          <select onchange="pxcSelectOpt('${st.id}',${p.id},this.value)" style="${selS};color:${tc}">
+        return `<td id="pxc-td-${st.id}-${p.id}" style="${tdC};background:${bg};padding:2px 3px;position:relative">
+          <span class="pxc-wm" style="position:absolute;left:2px;top:50%;transform:translateY(-50%);font-size:9px;font-weight:700;color:var(--ink3);opacity:0;pointer-events:none;transition:opacity .15s;user-select:none">P${p.id}</span>
+          <select onchange="pxcSelectOpt('${st.id}',${p.id},this.value)"
+            style="${selS};color:${tc}">
             <option value="">—</option>
             ${p.opts.map(o=>`<option value="${o.lbl}"${sel===o.lbl?' selected':''}>${o.lbl}${o.pts>0?' '+o.pts+'p':''}</option>`).join('')}
           </select>
-        </div>`;
-      }).join('');
-      return`<div data-pxc-stu="${st.id}" data-letter="${fl}"
-        onclick="pxcActivateRow(this,'${st.id}')"
-        style="display:grid;grid-template-columns:${gridCols};width:${totalW}px;background:${rowBg};cursor:pointer">
-        <div style="${cellStyle};font-size:10px;color:var(--ink3);font-weight:600;background:${rowBg}">${i+1}</div>
-        <div style="${cellStyle};text-align:left;justify-content:flex-start;font-weight:600;font-size:11px;background:${rowBg};overflow:hidden;white-space:nowrap">${esc(st.nombre)}</div>
-        ${qCells}
-        <div id="pxco-${st.id}" style="${cellStyle};font-size:10px;color:var(--ink2);background:${rowBg}">${hasResp?obt.toFixed(1)+'/'+total.toFixed(1):'—'}</div>
-        <div id="pxcn-${st.id}" class="pn ${nota!==null?notaCls(nota):'em'}" style="${cellStyle};font-size:12px;font-weight:700;background:${rowBg}">${nota!==null?nota.toFixed(1):'—'}</div>
-      </div>`;
-    }).join('');
+        </td>`;
+      }).join('')}
+      <td id="pxco-${st.id}" style="${tdC};font-size:11px;color:var(--ink2);white-space:nowrap">${hasResp?obt.toFixed(1)+'/'+total.toFixed(1):'—'}</td>
+      <td id="pxcn-${st.id}" class="pn ${nota!==null?notaCls(nota):'em'}" style="${tdC};font-size:13px;font-weight:700">${nota!==null?nota.toFixed(1):'—'}</td>
+    </tr>`;
+  }).join('');
 
-    // Wrap en div scrollable horizontal
-    const wrap=document.getElementById('pxc-list-wrap');
-    if(wrap){
-      wrap.style.overflowX='auto';
-      wrap.style.overflowY='auto';
-      wrap.style.webkitOverflowScrolling='touch';
-      wrap.style.marginRight='32px';
-    }
-    el.style.display='block';
-    el.style.width=totalW+'px';
-    el.innerHTML=rows;
-
-  } else {
-    // ── Web: tabla HTML normal con sticky columns ──
-    const thC='background:var(--sf2);padding:5px 8px;border:1px solid var(--br);font-size:11px;font-weight:700;color:var(--ink2);white-space:nowrap;text-align:center';
-    const tdC='padding:3px 5px;border:1px solid var(--br);text-align:center;vertical-align:middle;background:var(--sf)';
-    const selS='border:none;background:transparent;font-size:11px;font-weight:700;cursor:pointer;width:100%;text-align:center;padding:2px 0';
-
-    const thead=`<thead><tr>
-      <th style="${thC};min-width:32px;position:sticky;left:0;z-index:3">#</th>
-      <th style="${thC};min-width:140px;text-align:left;position:sticky;left:32px;z-index:3">Estudiante</th>
-      ${preguntas.map(p=>{const lv=pxcGetLevel(p,total);return`<th style="${thC};color:${lv.color};min-width:70px">P${p.id}<br><span style="font-weight:400;font-size:10px">${p.maxPts}pt</span></th>`;}).join('')}
-      <th style="${thC};min-width:70px">Pts</th>
-      <th style="${thC};min-width:48px">Nota</th>
-    </tr></thead>`;
-
-    const tbody=studs.map((st,i)=>{
-      const resp=_pxcBuf[st.id]||{};
-      const obt=preguntas.reduce((s,p)=>{
-        const sel=resp[String(p.id)];if(!sel)return s;
-        const opt=p.opts.find(o=>o.lbl===sel);return s+(opt?opt.pts:0);
-      },0);
-      const hasResp=Object.values(resp).some(v=>v&&v!=='');
-      const nota=hasResp?calcNota(obt,total):null;
-      const rowBg=i%2===0?'var(--sf)':'var(--sf2)';
-      const fl=st.nombre.trim()[0]?.toUpperCase()||'';
-      return`<tr data-pxc-stu="${st.id}" data-letter="${fl}" style="background:${rowBg};cursor:pointer"
-        onclick="pxcActivateRow(this,'${st.id}')">
-        <td style="${tdC};font-size:11px;color:var(--ink3);font-weight:600;position:sticky;left:0;background:${rowBg};z-index:1">${i+1}</td>
-        <td style="${tdC};text-align:left;font-weight:600;white-space:nowrap;position:sticky;left:32px;background:${rowBg};z-index:1;font-size:12px">${esc(st.nombre)}</td>
-        ${preguntas.map(p=>{
-          const lv=pxcGetLevel(p,total);
-          const sel=resp[String(p.id)]||'';
-          const selOpt=sel?p.opts.find(o=>o.lbl===sel):null;
-          const selPts=selOpt?selOpt.pts:null;
-          const intensity=selPts!==null&&p.maxPts>0?selPts/p.maxPts:0;
-          const bg=selPts===null?'var(--sf)':selPts===0?'var(--sf2)':`rgba(${hexToRgb(lv.bg)},${0.25+intensity*0.75})`;
-          const tc=sel?lv.color:'var(--ink3)';
-          return`<td id="pxc-td-${st.id}-${p.id}" style="${tdC};background:${bg};padding:2px 3px;position:relative">
-            <span class="pxc-wm" style="position:absolute;left:2px;top:50%;transform:translateY(-50%);font-size:9px;font-weight:700;color:var(--ink3);opacity:0;pointer-events:none;transition:opacity .15s;user-select:none">P${p.id}</span>
-            <select onchange="pxcSelectOpt('${st.id}',${p.id},this.value)" style="${selS};color:${tc}">
-              <option value="">—</option>
-              ${p.opts.map(o=>`<option value="${o.lbl}"${sel===o.lbl?' selected':''}>${o.lbl}${o.pts>0?' '+o.pts+'p':''}</option>`).join('')}
-            </select>
-          </td>`;
-        }).join('')}
-        <td id="pxco-${st.id}" style="${tdC};font-size:11px;color:var(--ink2);white-space:nowrap">${hasResp?obt.toFixed(1)+'/'+total.toFixed(1):'—'}</td>
-        <td id="pxcn-${st.id}" class="pn ${nota!==null?notaCls(nota):'em'}" style="${tdC};font-size:13px;font-weight:700">${nota!==null?nota.toFixed(1):'—'}</td>
-      </tr>`;
-    }).join('');
-    el.innerHTML=thead+'<tbody>'+tbody+'</tbody>';
-    el.style.display='';
-    el.style.width='';
-  }
-
-  // Índice alfabético lateral (común a ambas plataformas)
+  // Índice alfabético lateral
   const letterIdx=`<div id="pxc-letter-idx" style="position:absolute;right:0;top:0;bottom:0;width:32px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:2px;z-index:20;background:var(--sf);border-left:1px solid var(--br);overflow-y:auto;padding:4px 0">
     ${letters.map(l=>`<button onclick="pxcScrollToLetter('${l}')" style="width:26px;min-height:22px;font-size:11px;font-weight:700;border:none;background:transparent;color:var(--ac);cursor:pointer;border-radius:4px;padding:2px 0;line-height:1;flex-shrink:0;touch-action:manipulation" title="Ir a ${l}">${l}</button>`).join('')}
   </div>`;
+
+  // Actualizar la tabla sin reemplazar el contenedor
+  el.innerHTML = thead2 + '<tbody>' + tbody + '</tbody>';
+
+  // Índice lateral — fuera del wrapper de tabla para no romper el layout
+  // Se ancla dentro del bank-ov como overlay absoluto
   const old=document.getElementById('pxc-letter-idx');
   if(old)old.remove();
   const ov=document.getElementById('pxc-grade-ov');
-  if(ov)ov.insertAdjacentHTML('beforeend',letterIdx);
+  if(ov){
+    ov.insertAdjacentHTML('beforeend',letterIdx);
+    // Scroll del índice actúa sobre el wrapper, no el ov
+    window._pxcWrap=document.getElementById('pxc-list-wrap');
+  }
 }
 
+// Activar fila y mostrar watermarks
+function pxcActivateRow(tr, stuId){
+  const prev=document.querySelector('[data-pxc-stu].pxc-row-active');
+  // Siempre limpiar la fila previa completamente
+  if(prev){
+    prev.classList.remove('pxc-row-active');
+    prev.querySelectorAll('.pxc-wm').forEach(el=>el.style.opacity='0');
+    prev.style.outline='';
+    prev.style.outlineOffset='';
+  }
+  if(prev===tr)return; // toggle off al tocar la misma fila
+  // Activar nueva fila
+  tr.classList.add('pxc-row-active');
+  tr.querySelectorAll('.pxc-wm').forEach(el=>el.style.opacity='0.45');
+  tr.style.outline='2px solid var(--ac)';
+  tr.style.outlineOffset='-2px';
+}
+
+// Scroll a primera letra
+function pxcScrollToLetter(letter){
+  const tr=document.querySelector('[data-pxc-stu][data-letter="'+letter+'"]');
+  if(!tr)return;
+  tr.scrollIntoView({behavior:'smooth',block:'start'});
+}
 
 function hexToRgb(hex){
   const r=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
