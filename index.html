@@ -10948,6 +10948,17 @@ function renderPxcList(){
   // Índice alfabético — letras presentes en los estudiantes
   const letters=[...new Set(studs.map(st=>st.nombre.trim()[0]?.toUpperCase()||''))].sort();
 
+  // position:sticky en <td> no funciona en Android WebView — deshabilitar
+  const isAndroid=typeof AndroidDrive!=='undefined';
+  const stickyNo=isAndroid?'':'position:sticky;';
+  const thead2=isAndroid?`<thead><tr>
+    <th style="${thC};min-width:32px">#</th>
+    <th style="${thC};min-width:140px;text-align:left">Estudiante</th>
+    ${preguntas.map(p=>{const lv=pxcGetLevel(p,total);return `<th style="${thC};color:${lv.color};min-width:70px">P${p.id}<br><span style="font-weight:400;font-size:10px">${p.maxPts}pt</span></th>`;}).join('')}
+    <th style="${thC};min-width:70px">Pts</th>
+    <th style="${thC};min-width:48px">Nota</th>
+  </tr></thead>`:thead;
+
   const tbody=studs.map((st,i)=>{
     const resp=_pxcBuf[st.id]||{};
     const obt=preguntas.reduce((s,p)=>{
@@ -10962,8 +10973,8 @@ function renderPxcList(){
     const firstLetter=st.nombre.trim()[0]?.toUpperCase()||'';
     return `<tr data-pxc-stu="${st.id}" data-letter="${firstLetter}" style="background:${rowBg};cursor:pointer"
       onclick="pxcActivateRow(this,'${st.id}')">
-      <td style="${tdC};font-size:11px;color:var(--ink3);font-weight:600;position:sticky;left:0;background:${rowBg};z-index:1">${i+1}</td>
-      <td style="${tdC};text-align:left;font-weight:600;white-space:nowrap;position:sticky;left:32px;background:${rowBg};z-index:1;font-size:12px">${esc(st.nombre)}</td>
+      <td style="${tdC};font-size:11px;color:var(--ink3);font-weight:600;${stickyNo}left:0;background:${rowBg};z-index:1">${i+1}</td>
+      <td style="${tdC};text-align:left;font-weight:600;white-space:nowrap;${stickyNo}left:32px;background:${rowBg};z-index:1;font-size:12px">${esc(st.nombre)}</td>
       ${preguntas.map(p=>{
         const lv=pxcGetLevel(p,total);
         const sel=resp[String(p.id)]||'';
@@ -10992,7 +11003,7 @@ function renderPxcList(){
   </div>`;
 
   // Actualizar la tabla sin reemplazar el contenedor
-  el.innerHTML = thead + '<tbody>' + tbody + '</tbody>';
+  el.innerHTML = thead2 + '<tbody>' + tbody + '</tbody>';
 
   // Índice lateral — fuera del wrapper de tabla para no romper el layout
   // Se ancla dentro del bank-ov como overlay absoluto
