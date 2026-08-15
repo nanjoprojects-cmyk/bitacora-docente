@@ -10411,10 +10411,10 @@ function renderAeList(){
       <div style="display:flex;gap:5px;align-items:center;margin-top:6px">
         <input id="ae-new-cmt-${st.id}" type="text" autocomplete="off"
           style="flex:1;min-width:90px;font-size:11px;padding:4px 7px;border-radius:var(--rs);border:1px solid var(--br);background:var(--sf);color:var(--ink);cursor:pointer"
-          readonly placeholder="Toca para comentar…"
+          readonly placeholder="Escribe un comentario y pulsa ＋ Comentario…"
           onclick="this.removeAttribute('readonly');this.placeholder='Escribe el comentario…';"
           onkeydown="if(event.key==='Enter'){event.preventDefault();aeAddCmt('${st.id}');}">
-        <button class="btn xs" onclick="aeAddCmt('${st.id}')" style="flex-shrink:0">＋</button>
+        <button class="btn xs primary" onclick="aeAddCmt('${st.id}')" style="flex-shrink:0;font-size:11px;padding:4px 8px">＋ Comentario</button>
       </div>
       ${cmtHTML}
     </div>`;
