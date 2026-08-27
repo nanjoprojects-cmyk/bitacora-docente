@@ -1594,6 +1594,7 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
           <select id="act-type" onchange="onActTypeChange()" style="font-size:13px">
             <option value="standard">Estándar — (obt/pos)×4+1</option>
             <option value="banco">Tipo Banco — 3+(pts/máx)×2</option>
+            <option value="entregas">Entregas múltiples — nota ponderada</option>
           </select>
         </div>
         <div id="act-pos-wrap" style="min-width:120px">
@@ -1604,6 +1605,19 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
           <label>Máx. puntos banco</label>
           <input type="number" id="act-maxpts" placeholder="10" min="1" style="max-width:140px">
         </div>
+      </div>
+      <!-- ENTREGAS MÚLTIPLES BUILDER -->
+      <div id="act-entregas-wrap" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <label style="margin:0">Entregas de la actividad</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:var(--ink3)">Suma de pesos:</span>
+            <span id="act-peso-sum" style="font-size:14px;font-weight:700;color:var(--err)">0%</span>
+          </div>
+        </div>
+        <div id="act-entregas-list" style="display:flex;flex-direction:column;gap:6px"></div>
+        <button type="button" class="btn sm" onclick="addEntregaRow()" style="margin-top:8px;width:100%">＋ Agregar entrega</button>
+        <p id="act-peso-warn" style="display:none;font-size:11px;color:var(--err);margin-top:4px">⚠ La suma de pesos debe ser exactamente 100% para guardar.</p>
       </div>
 
       <div class="fg">
@@ -3536,7 +3550,8 @@ function renderGrades(){
       const s=sc[a.id]||{};
       const obt=s.obt??'';const pos=s.pos??a.posibles??'';
       const isBanco=a.actType==='banco';
-      const nota=isBanco?calcNotaBanco(obt,a.maxPtsBanco||10):calcNota(obt,pos);
+      const isEntregas=a.actType==='entregas';
+      const nota=isEntregas?calcEntregasNota(a,st.id,data):isBanco?calcNotaBanco(obt,a.maxPtsBanco||10):calcNota(obt,pos);
       // Use recovery note for averages if exists and nota was failing
       const recovNota=(s.recovery&&s.recovery.obt!==''&&s.recovery.obt!==undefined)
         ?(isBanco?calcNotaBanco(s.recovery.obt,a.maxPtsBanco||10):calcNota(s.recovery.obt,s.recovery.pos??s.pos??a.posibles??''))
@@ -4091,6 +4106,10 @@ function openActModal(cId,asig,per,pilar){
   document.getElementById('act-indicador').value='';
   const actTypeSel=document.getElementById('act-type');
   if(actTypeSel)actTypeSel.value='standard';
+  // Limpiar builder de entregas
+  const entList=document.getElementById('act-entregas-list');
+  if(entList)entList.innerHTML='';
+  _entregasIdxC=0;
   onActTypeChange();
 
   // ── Asignatura selector for current course ──
@@ -4149,8 +4168,59 @@ function onActTypeChange(){
   const t=document.getElementById('act-type')?.value;
   const pw=document.getElementById('act-pos-wrap');
   const mw=document.getElementById('act-maxpts-wrap');
-  if(pw)pw.style.display=t==='banco'?'none':'';
+  const ew=document.getElementById('act-entregas-wrap');
+  if(pw)pw.style.display=(t==='banco'||t==='entregas')?'none':'';
   if(mw)mw.style.display=t==='banco'?'':'none';
+  if(ew)ew.style.display=t==='entregas'?'':'none';
+  if(t==='entregas'&&!document.querySelectorAll('.entrega-row').length) addEntregaRow();
+}
+let _entregasIdxC=0;
+function addEntregaRow(name='',peso='',posibles='',modoNota=false){
+  const list=document.getElementById('act-entregas-list');
+  if(!list)return;
+  const idx=_entregasIdxC++;
+  const div=document.createElement('div');
+  div.className='entrega-row';
+  div.style.cssText='display:grid;grid-template-columns:1fr 60px 80px auto auto;gap:6px;align-items:center';
+  div.innerHTML=
+    '<input placeholder="Nombre de la entrega" value="'+esc(name)+'" style="font-size:12px;padding:4px 8px;border:1px solid var(--br);border-radius:var(--rs)">'+
+    '<div style="display:flex;align-items:center;gap:2px"><input type="number" placeholder="%" value="'+peso+'" min="0" max="100" style="width:50px;font-size:12px;padding:4px 5px;border:1px solid var(--br);border-radius:var(--rs)" oninput="updatePesoSum()"><span style="font-size:10px;color:var(--ink3)">%</span></div>'+
+    '<div class="entrega-pos-wrap" style="display:flex;align-items:center;gap:2px"'+(modoNota?' hidden':'')+'>'+
+      '<input type="number" placeholder="pts" value="'+posibles+'" min="1" style="width:58px;font-size:12px;padding:4px 5px;border:1px solid var(--br);border-radius:var(--rs)">'+
+      '<span style="font-size:10px;color:var(--ink3)">pts</span></div>'+
+    '<label style="font-size:10px;color:var(--ink3);display:flex;align-items:center;gap:3px;cursor:pointer" title="Ingresar nota directa 1-5 en vez de puntos">'+
+      '<input type="checkbox" '+(modoNota?'checked':'')+' onchange="toggleEntregaModo(this)" style="accent-color:var(--ac)">nota</label>'+
+    '<button type="button" onclick="removeEntregaRow(this)" style="border:none;background:none;color:var(--err);cursor:pointer;font-size:16px;padding:0 4px" title="Eliminar entrega">✕</button>';
+  list.appendChild(div);
+  updatePesoSum();
+}
+function toggleEntregaModo(chk){
+  const row=chk.closest('.entrega-row');
+  const posWrap=row.querySelector('.entrega-pos-wrap');
+  if(posWrap)posWrap.hidden=chk.checked;
+}
+function removeEntregaRow(btn){
+  btn.closest('.entrega-row').remove();
+  updatePesoSum();
+}
+function updatePesoSum(){
+  const rows=[...document.querySelectorAll('.entrega-row')];
+  const total=rows.reduce((s,r)=>s+Number(r.querySelectorAll('input[type=number]')[0]?.value||0),0);
+  const el=document.getElementById('act-peso-sum');
+  const warn=document.getElementById('act-peso-warn');
+  if(el){el.textContent=total+'%';el.style.color=total===100?'var(--ok)':'var(--err)';}
+  if(warn)warn.style.display=total===100?'none':'block';
+}
+function getEntregasFromBuilder(){
+  const rows=[...document.querySelectorAll('.entrega-row')];
+  return rows.map(function(r,i){
+    const inputs=r.querySelectorAll('input');
+    const name=inputs[0].value.trim();
+    const peso=Number(inputs[1].value||0);
+    const modoNota=inputs[3].checked;
+    const posibles=modoNota?0:Number(inputs[2].value||0);
+    return{id:'e'+(i+1),name,peso,posibles,modoNota};
+  });
 }
 function saveActivity(){
   const name=document.getElementById('act-name').value.trim();
@@ -4164,9 +4234,16 @@ function saveActivity(){
   const indicador=document.getElementById('act-indicador').value.trim();
   const actType=document.getElementById('act-type')?.value||'standard';
   const maxPtsBanco=document.getElementById('act-maxpts')?.value||'10';
+  if(actType==='entregas'){
+    const entregas=getEntregasFromBuilder();
+    const pesoSum=entregas.reduce((s,e)=>s+e.peso,0);
+    if(pesoSum!==100){toast('La suma de pesos debe ser 100%. Actualmente: '+pesoSum+'%','e');return;}
+    if(entregas.some(e=>!e.name)){toast('Todas las entregas deben tener nombre','e');return;}
+  }
   const act={id:uid(),name,pilar,posibles:posibles||'',desc,indicador,
     actType,
-    ...(actType==='banco'?{maxPtsBanco:Number(maxPtsBanco),posibles:''}:{})};
+    ...(actType==='banco'?{maxPtsBanco:Number(maxPtsBanco),posibles:''}:{}),
+    ...(actType==='entregas'?{entregas:getEntregasFromBuilder(),posibles:''}:{})};
   getGrD(pendActC,asig,pendActP).activities.push(act);
 
   // Copy to checked courses using the per-course asignatura dropdown
@@ -4179,7 +4256,7 @@ function saveActivity(){
     const destAsig=destAsigSel?.value||destC.subjects?.[0]||asig;
     const destD=getGrD(destCId,destAsig,pendActP);
     if(!destD.activities.find(a=>a.name===name&&a.pilar===pilar)){
-      destD.activities.push({id:uid(),name,pilar,posibles:posibles||'',desc,indicador,actType,...(actType==='banco'?{maxPtsBanco:Number(maxPtsBanco)}:{})});
+      destD.activities.push({id:uid(),name,pilar,posibles:posibles||'',desc,indicador,actType,...(actType==='banco'?{maxPtsBanco:Number(maxPtsBanco)}:{}),...(actType==='entregas'?{entregas:getEntregasFromBuilder(),posibles:''}:{})});
     }
   });
 
@@ -7474,6 +7551,7 @@ const HELP_SECTIONS=[
         <div class="help-step"><span class="help-num">🎯</span><div><strong>Prueba por Competencias (PxC)</strong><br>El pilar PxC tiene su propio sistema. Primero configure las preguntas con sus opciones A/B/C/D y puntajes. Luego, al calificar, seleccione la respuesta de cada estudiante en el desplegable de cada columna. La nota se calcula y colorea en tiempo real. Use el índice de letras a la derecha para saltar rápido a un estudiante.</div></div>
         <div class="help-step"><span class="help-num">📋</span><div><strong>Copiar PxC a otros cursos</strong><br>Desde la configuración de la prueba, el botón <em>📋 Copiar a cursos…</em> le permite aplicar las mismas preguntas a otros cursos del mismo grado sin tener que crearlas de nuevo.</div></div>
         <div class="help-step"><span class="help-num">📄</span><div><strong>Planilla Definitiva</strong><br>La pestaña Resumen muestra la nota definitiva de cada estudiante con el cálculo ponderado de los cuatro pilares. Desde aquí también puede abrir la vista personal de cada estudiante tocando su nombre.</div></div>
+        <div class="help-step"><span class="help-num">📦</span><div><strong>Actividades con entregas múltiples</strong><br>Al crear una nueva actividad, seleccione el tipo <strong>Entregas múltiples — nota ponderada</strong>. Luego defina cada entrega con su nombre, peso (%) y puntos posibles (o active "nota" para ingresar nota directa 1-5). La suma de pesos debe ser 100%. La nota de la actividad se calcula automáticamente ponderando lo que ya esté calificado. Al tocar la celda en la planilla se abre una ventana con una fila por entrega. Desde la vista personal del estudiante también puede editar cada entrega individualmente.</div></div>
         <div class="help-step"><span class="help-num">🔄</span><div><strong>Modo semestral (parciales)</strong><br>Para cursos con evaluación semestral, active <em>Evaluación con parciales</em> en Configuración → Cursos. Esto reemplaza PxC por Parcial 1 y Parcial 3, con pesos del 30% cada uno.</div></div>
         <div class="help-step"><span class="help-num">💬</span><div><strong>Comentarios en notas</strong><br>Al abrir la ventana de calificación de cualquier actividad, puede escribir comentarios individuales por estudiante. Quedan guardados con fecha y se ven en la vista personal del estudiante.</div></div>
       </div>
@@ -7698,6 +7776,24 @@ function _actPilar(a){
   }
   return 'hacer'; // tareasBank default
 }
+
+// ── Entregas: calcula nota ponderada proporcional a lo calificado ──
+function calcEntregasNota(act, stuId, data){
+  const stored=((data.scores||{})[stuId]||{})[act.id]||{};
+  const entScores=stored.entregas||{};
+  const entregas=act.entregas||[];
+  let pesoTotal=0, notaSum=0;
+  entregas.forEach(function(e){
+    const sc=entScores[e.id];
+    if(!sc||sc.obt===''||sc.obt===undefined||sc.obt===null)return;
+    const nota=e.modoNota?Number(sc.obt):calcNota(Number(sc.obt),e.posibles||1);
+    if(nota===null)return;
+    pesoTotal+=e.peso;
+    notaSum+=nota*e.peso;
+  });
+  return pesoTotal>0?Math.round((notaSum/pesoTotal)*100)/100:null;
+}
+
 function getActNota(grData, a, stuId){
   // Bank auto activities — always live from bank data
   if(a.partBank){
@@ -7713,6 +7809,10 @@ function getActNota(grData, a, stuId){
       grData['tareasMax_'+tPilar]||10);
   }
   const s=(grData.scores[stuId]||{})[a.id]||{};
+  // Entregas múltiples — nota ponderada proporcional
+  if(a.actType==='entregas'){
+    return calcEntregasNota(a,stuId,grData);
+  }
   // Custom banco activity — banco formula with stored obt
   if(a.actType==='banco'){
     return s.obt!==''&&s.obt!==undefined
@@ -10211,7 +10311,9 @@ function openActEntry(actId,cId,asig,per,focusStuId){
     // Migrate legacy single comment to comments array
     let comments=s.comments?[...s.comments]:[];
     if(s.comment&&!comments.length) comments=[{id:uid(),text:s.comment,fecha:s.commentDate||today()}];
-    _aeBuf[st.id]={obt:s.obt??'',pos:s.pos??'',posFixed:!!s.posFixed,comments};
+    // Cargar también notas de entregas si aplica
+    const entregasData=s.entregas?JSON.parse(JSON.stringify(s.entregas)):{};
+    _aeBuf[st.id]={obt:s.obt??'',pos:s.pos??'',posFixed:!!s.posFixed,comments,entregas:entregasData};
   });
   // Header
   document.getElementById('act-entry-title').textContent='📝 '+act.name;
@@ -10232,6 +10334,12 @@ function openActEntry(actId,cId,asig,per,focusStuId){
   if(descInp)descInp.value='';
   const obtInp=document.getElementById('ae-global-obt');
   if(obtInp)obtInp.value='';
+  // Mostrar/ocultar barras de config según tipo de actividad
+  const isEntregasAct=act?.actType==='entregas';
+  const cfgBar=document.querySelector('#act-entry-ov .bank-body>div:first-child');
+  const applyBar=document.querySelector('#act-entry-ov .bank-body>div:nth-child(2)');
+  if(cfgBar)cfgBar.style.display=isEntregasAct?'none':'';
+  if(applyBar)applyBar.style.display=isEntregasAct?'none':'';
   renderAeList();
   document.getElementById('act-entry-ov').classList.add('open');
   // Auto-scroll to focus student if given
@@ -10269,6 +10377,14 @@ function closeActEntry(){
   }
   document.getElementById('act-entry-ov').classList.remove('open');
   _aeBuf={};
+  // Restaurar barras al cerrar y limpiar barra de entregas
+  const cfgBar2=document.querySelector('#act-entry-ov .bank-body>div:first-child');
+  const applyBar2=document.querySelector('#act-entry-ov .bank-body>div:nth-child(2)');
+  if(cfgBar2)cfgBar2.style.display='';
+  if(applyBar2)applyBar2.style.display='';
+  const entCfg=document.getElementById('ae-ent-config');
+  if(entCfg)entCfg.remove();
+  _aeModoNota=false;
 }
 
 function toggleAeModo(){
@@ -10300,6 +10416,192 @@ function aeObt2Nota(obt, pos){
   if(!pos||pos===0||obt==='')return null;
   return Math.round(calcNota(obt,pos)*10)/10;
 }
+function renderAeEntregas(act, data, studs, cId, asig, per){
+  const el=document.getElementById('ae-list');
+  if(!el)return;
+  const entregas=act.entregas||[];
+  const modoNota=_aeModoNota; // toggle global
+
+  // ── Barra de config propia para entregas ──
+  const configId='ae-ent-config';
+  let cfgBar=document.getElementById(configId);
+  if(!cfgBar){
+    cfgBar=document.createElement('div');
+    cfgBar.id=configId;
+    cfgBar.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--sf2);border-radius:var(--rs);padding:9px 12px;margin-bottom:8px';
+    el.parentElement.insertBefore(cfgBar,el);
+  }
+  cfgBar.innerHTML=
+    '<span style="font-size:12px;color:var(--ink3);font-weight:600">Entregas múltiples</span>'+
+    '<button id="ae-ent-modo-btn" onclick="toggleAeEntregasModo()" '+
+    'style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--br);background:var(--sf);color:var(--ink2);cursor:pointer;font-weight:600">'+
+    (modoNota?'🎯 Modo: Nota':'📝 Modo: Pts')+'</button>'+
+    '<span style="flex:1"></span>'+
+    '<button class="btn sm primary" onclick="saveActEntry()">💾 Guardar</button>';
+
+  // ── Número de columnas para colspan ──
+  const nCols=entregas.length+3; // #, nombre, entregas, nota
+
+  // ── Encabezado ──
+  let thead='<thead><tr>'+
+    '<th style="padding:5px 6px;background:var(--sf2);border:1px solid var(--br);font-size:11px;font-weight:700;position:sticky;left:0;z-index:3;min-width:28px">#</th>'+
+    '<th style="padding:5px 8px;background:var(--sf2);border:1px solid var(--br);font-size:11px;font-weight:700;text-align:left;position:sticky;left:28px;z-index:3">Estudiante</th>';
+  entregas.forEach(function(e){
+    const useNota=modoNota||(!!e.modoNota);
+    thead+='<th style="padding:5px 6px;background:var(--sf2);border:1px solid var(--br);font-size:10px;font-weight:700;min-width:90px;text-align:center">'+
+      esc(e.name)+'<br><span style="font-weight:400;color:var(--ink3)">'+e.peso+'%'+
+      (useNota?'':((e.posibles||'')?' / '+e.posibles+' pts':''))+
+      '</span></th>';
+  });
+  thead+='<th style="padding:5px 6px;background:var(--sf2);border:1px solid var(--br);font-size:11px;font-weight:700;min-width:52px">Nota</th></tr></thead>';
+
+  // ── Filas ──
+  let tbody=studs.map(function(st,i){
+    const saved=((data.scores||{})[st.id]||{})[act.id]||{};
+    const entSaved=saved.entregas||{};
+    const entBuf=(_aeBuf[st.id]||{}).entregas||{};
+    const rowBg=i%2===0?'var(--sf)':'var(--sf2)';
+
+    // Nota final (buffer + guardado)
+    let pesoCalif=0,notaSum=0;
+    entregas.forEach(function(e){
+      const bufObj=entBuf[e.id]; const savObj=entSaved[e.id];
+      const obt=bufObj!==undefined&&bufObj!==''&&bufObj!==null?
+        (typeof bufObj==='object'?bufObj.obt:bufObj):
+        (savObj&&savObj.obt!==undefined&&savObj.obt!==''?savObj.obt:undefined);
+      if(obt===undefined||obt===null||obt==='')return;
+      const useNota=modoNota||(!!e.modoNota);
+      const n=useNota?Number(obt):calcNota(Number(obt),e.posibles||1);
+      if(n===null)return;
+      pesoCalif+=e.peso;notaSum+=n*e.peso;
+    });
+    const notaDisp=pesoCalif>0?Math.round(notaSum/pesoCalif*100)/100:null;
+
+    let cells='';
+    entregas.forEach(function(e){
+      const bufObj=entBuf[e.id]; const savObj=entSaved[e.id];
+      const curObt=bufObj!==undefined&&bufObj!==''&&bufObj!==null?
+        String(typeof bufObj==='object'?bufObj.obt:bufObj):
+        (savObj&&savObj.obt!==undefined&&savObj.obt!==''?String(savObj.obt):'');
+      const useNota=modoNota||(!!e.modoNota);
+      const nota=curObt!==''?(useNota?Number(curObt):calcNota(Number(curObt),e.posibles||1)):null;
+      cells+='<td style="padding:3px 4px;border:1px solid var(--br);text-align:center;background:'+rowBg+'">'+
+        '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'+
+        '<input type="number" min="'+(useNota?'1':'0')+'" '+(useNota?'max="5" ':'')+
+        'step="'+(useNota?'0.1':'0.5')+'" value="'+curObt+'" placeholder="'+(useNota?'nota':'pts')+'"'+
+        ' data-sid="'+st.id+'" data-eid="'+e.id+'" data-act="'+act.id+'"'+
+        ' data-modo="'+(useNota?'1':'0')+'" data-pos="'+(e.posibles||1)+'"'+
+        ' style="width:56px;font-size:13px;font-weight:700;text-align:center;border:1px solid var(--br);border-radius:var(--rs);padding:3px 4px;background:var(--bg)"'+
+        ' oninput="aeEntregaInput(this)">'+
+        (nota!==null?'<span class="pn '+notaCls(nota)+'" style="font-size:11px">'+nota.toFixed(1)+'</span>':
+        '<span style="font-size:11px;color:var(--ink3)">—</span>')+
+        '</div></td>';
+    });
+
+    // Verificar si hay comentarios existentes
+    const hasCmt=entregas.some(function(e){
+      const b2=entBuf[e.id]; const s2=entSaved[e.id];
+      const c=b2&&typeof b2==='object'?b2.comment:undefined;
+      const cs=s2?s2.comment:undefined;
+      return (c||cs||'').trim().length>0;
+    });
+
+    const mainRow='<tr data-stu="'+st.id+'">'+
+      '<td style="padding:4px 5px;border:1px solid var(--br);font-size:11px;color:var(--ink3);font-weight:600;background:'+rowBg+';position:sticky;left:0;z-index:1">'+(i+1)+'</td>'+
+      '<td style="padding:4px 8px;border:1px solid var(--br);font-size:12px;font-weight:600;text-align:left;white-space:nowrap;background:'+rowBg+';position:sticky;left:28px;z-index:1">'+
+        '<span style="cursor:pointer" onclick="toggleAeEntCmt(\''+st.id+'\')" title="Ver/ocultar comentarios">'+esc(st.nombre)+
+        (hasCmt?' <span style="font-size:10px;color:var(--ac)">💬</span>':' <span style="font-size:10px;color:var(--br)">💬</span>')+
+        '</span></td>'+
+      cells+
+      '<td id="ae-ent-nota-'+st.id+'" class="pn '+(notaDisp!==null?notaCls(notaDisp):'em')+'" style="padding:4px 5px;border:1px solid var(--br);font-size:14px;font-weight:700;text-align:center">'+
+      (notaDisp!==null?notaDisp.toFixed(1):'—')+'</td></tr>';
+
+    // Fila de comentarios (colapsada por defecto, salvo si ya tenía)
+    const cmtCells=entregas.map(function(e){
+      const bufObj2=entBuf[e.id]; const savObj2=entSaved[e.id];
+      const existCmt=(bufObj2&&typeof bufObj2==='object'?bufObj2.comment:undefined)||(savObj2?savObj2.comment:'')||'';
+      return '<td style="padding:4px 6px;border:1px solid var(--br);background:var(--acl)">'+
+        '<input type="text" placeholder="Comentario para '+esc(e.name)+'..." value="'+esc(existCmt)+'"'+
+        ' data-sid="'+st.id+'" data-eid="'+e.id+'" data-act="'+act.id+'"'+
+        ' style="width:100%;font-size:11px;border:1px solid var(--br);border-radius:var(--rs);padding:3px 6px;background:var(--bg)"'+
+        ' oninput="aeEntregaCmt(this)"></td>';
+    }).join('');
+    const cmtRow='<tr id="ae-ent-cmt-'+st.id+'" style="display:'+(hasCmt?'':'none')+'">'+
+      '<td style="padding:2px 4px;border:1px solid var(--br);background:var(--acl);font-size:9px;color:var(--ac);text-align:center">💬</td>'+
+      '<td style="padding:4px 6px;border:1px solid var(--br);background:var(--acl);font-size:11px;color:var(--ac);font-style:italic;position:sticky;left:28px">Comentarios</td>'+
+      cmtCells+
+      '<td style="border:1px solid var(--br);background:var(--acl)"></td></tr>';
+
+    return mainRow+cmtRow;
+  }).join('');
+
+  el.innerHTML='<table style="border-collapse:collapse;font-size:12px;min-width:100%;width:max-content">'+
+    thead+'<tbody>'+tbody+'</tbody></table>';
+}
+
+// Toggle fila de comentarios por estudiante
+function toggleAeEntCmt(stuId){
+  const row=document.getElementById('ae-ent-cmt-'+stuId);
+  if(row)row.style.display=row.style.display==='none'?'':'none';
+}
+
+// Toggle modo pts/nota para entregas
+function toggleAeEntregasModo(){
+  _aeModoNota=!_aeModoNota;
+  const data=getGrD(_ae.cId,_ae.asig,_ae.per);
+  const act=(data.activities||[]).find(function(a){return a.id===_ae.actId;});
+  if(act)renderAeEntregas(act,data,getStuDs(_ae.cId,_ae.per),_ae.cId,_ae.asig,_ae.per);
+}
+
+// Input de comentario por entrega
+function aeEntregaCmt(inp){
+  const stuId=inp.dataset.sid;
+  const eId=inp.dataset.eid;
+  const txt=inp.value;
+  if(!_aeBuf[stuId])_aeBuf[stuId]={obt:'',pos:'',posFixed:false,comments:[],entregas:{}};
+  if(!_aeBuf[stuId].entregas)_aeBuf[stuId].entregas={};
+  if(!_aeBuf[stuId].entregas[eId])_aeBuf[stuId].entregas[eId]={};
+  if(typeof _aeBuf[stuId].entregas[eId]==='number'||typeof _aeBuf[stuId].entregas[eId]!=='object'){
+    _aeBuf[stuId].entregas[eId]={obt:_aeBuf[stuId].entregas[eId]||''};
+  }
+  _aeBuf[stuId].entregas[eId].comment=txt;
+}
+
+
+function aeEntregaInput(inp){
+  const stuId=inp.dataset.sid;
+  const entregaId=inp.dataset.eid;
+  const actId=inp.dataset.act;
+  const modoNota=inp.dataset.modo==='1';
+  const posibles=Number(inp.dataset.pos)||1;
+  const val=inp.value;
+  if(!_aeBuf[stuId])_aeBuf[stuId]={obt:'',pos:'',posFixed:false,comments:[],entregas:{}};
+  if(!_aeBuf[stuId].entregas)_aeBuf[stuId].entregas={};
+  const prevEnt=_aeBuf[stuId].entregas[entregaId];
+  const prevComment=prevEnt&&typeof prevEnt==='object'?prevEnt.comment:'';
+  _aeBuf[stuId].entregas[entregaId]={obt:val===''?'':Number(val),...(prevComment?{comment:prevComment}:{})};
+  const nota=val===''?null:(modoNota?Number(val):calcNota(Number(val),posibles));
+  // Recalcular nota final del estudiante
+  const data=getGrD(_ae.cId,_ae.asig,_ae.per);
+  const act=(data.activities||[]).find(function(a){return a.id===actId;});
+  if(!act||!act.entregas)return;
+  const entBuf=_aeBuf[stuId].entregas||{};
+  const entScores=((data.scores||{})[stuId]||{})[actId]?.entregas||{};
+  let pesoCalif=0,notaSum=0;
+  act.entregas.forEach(function(e){
+    const raw=entBuf[e.id];
+    const obt=raw&&raw.obt!==''&&raw.obt!==undefined?raw.obt:(entScores[e.id]?.obt??'');
+    if(obt===''||obt===undefined)return;
+    const n=e.modoNota?Number(obt):calcNota(Number(obt),e.posibles||1);
+    if(n===null)return;
+    pesoCalif+=e.peso;notaSum+=n*e.peso;
+  });
+  const notaFinal=pesoCalif>0?Math.round(notaSum/pesoCalif*100)/100:null;
+  const nEl=document.getElementById('ae-ent-nota-'+stuId);
+  if(nEl){nEl.textContent=notaFinal!==null?notaFinal.toFixed(1):'—';nEl.className='pn '+(notaFinal!==null?notaCls(notaFinal):'em');}
+}
+
+
 function renderAeList(){
   const{cId,asig,per,actId}=_ae;
   const data=getGrD(cId,asig,per);
@@ -10311,6 +10613,11 @@ function renderAeList(){
   if(!studs.length){el.innerHTML='<div class="empty"><div class="et">Sin estudiantes</div></div>';return;}
   _buildBankAlpha(studs,'ae-alpha','ae-list');
   const posGlobal=parseFloat(document.getElementById('ae-pos')?.value)||act?.posibles||'';
+  // Entregas múltiples — UI especial
+  if(act?.actType==='entregas'){
+    renderAeEntregas(act,data,studs,cId,asig,per);
+    return;
+  }
   el.innerHTML=studs.map((st,i)=>{
     const buf=_aeBuf[st.id]||{obt:'',pos:'',comments:[]};
     const data=getGrD(_ae.cId,_ae.asig,_ae.per);
@@ -10665,6 +10972,47 @@ function saveActEntry(){
   markGrDirty();renderGrades();renderAeList();
   if(saved===0){toast('Sin cambios nuevos que guardar','s');}else{toast('Notas guardadas'+(saved<studs.length?' ('+saved+' cambios)':'')+(posGlobalChanged?' · posibles actualizados':''),'s');}
 }
+// Wrapper: saveActEntry maneja entregas
+const _saveActEntryOrig=saveActEntry;
+saveActEntry=function(){
+  const data=getGrD(_ae.cId,_ae.asig,_ae.per);
+  const act=(data.activities||[]).find(function(a){return a.id===_ae.actId;});
+  if(act&&act.actType==='entregas'){
+    pushUndo('Calificar entregas — '+esc(act.name));
+    if(!data.scores)data.scores={};
+    getStuDs(_ae.cId,_ae.per).forEach(function(st){
+      const buf=_aeBuf[st.id]||{};
+      const entBuf=buf.entregas||{};
+      if(!Object.keys(entBuf).length)return;
+      if(!data.scores[st.id])data.scores[st.id]={};
+      if(!data.scores[st.id][act.id])data.scores[st.id][act.id]={};
+      if(!data.scores[st.id][act.id].entregas)data.scores[st.id][act.id].entregas={};
+      Object.keys(entBuf).forEach(function(eId){
+        const v=entBuf[eId];
+        const isObj=v&&typeof v==='object';
+        const obt=isObj?v.obt:v;
+        const comment=isObj&&v.comment?v.comment:'';
+        const hasObt=obt!==''&&obt!==undefined&&obt!==null;
+        if(!hasObt&&!comment){
+          delete data.scores[st.id][act.id].entregas[eId];
+        } else {
+          const prev=data.scores[st.id][act.id].entregas[eId]||{};
+          data.scores[st.id][act.id].entregas[eId]={
+            ...prev,
+            ...(hasObt?{obt:Number(obt)}:{}),
+            ...(comment?{comment}:{})
+          };
+        }
+      });
+    });
+    save();markGrDirty();renderGrades();
+    toast('Entregas guardadas ✅','s');
+    closeActEntry();
+    return;
+  }
+  _saveActEntryOrig();
+};
+
 
 // ══════════════════════════════════════════════════════════════
 // PxC QUIZ — Prueba por Competencias con preguntas configurables
@@ -11798,7 +12146,8 @@ function _svInitBuf(){
       obt:sc.obt!==undefined?String(sc.obt):'',
       pos:sc.pos!==undefined?String(sc.pos):'',
       posFixed:!!sc.posFixed,
-      comments:cmts
+      comments:cmts,
+      entregas:sc.entregas?JSON.parse(JSON.stringify(sc.entregas)):{}
     };
   });
 }
@@ -11810,76 +12159,134 @@ function renderStuView(){
   const idx=studs.findIndex(s=>s.id===stuId);
   const data=getGrD(cId,asig,per);
   const c=getC(cId);
+  const evalMode=c?.evalMode||'normal';
+  const isParciales=evalMode==='parciales';
+
   document.getElementById('sv-stu-name').textContent=st.nombre;
   document.getElementById('sv-stu-sub').textContent=
-    (c?c.nombre+' \u00b7 ':'')+(asig||'')+' \u00b7 '+(per?'Per. '+per:'');
+    (c?c.nombre+'\u00b7 ':'')+(asig||'')+'\u00b7 '+(per?'Per. '+per:'');
   const prevBtn=document.getElementById('sv-prev-btn');
   const nextBtn=document.getElementById('sv-next-btn');
   if(prevBtn)prevBtn.disabled=(idx===0);
   if(nextBtn)nextBtn.disabled=(idx===studs.length-1);
 
-  const PILLARS=[
-    {key:'saber',label:'SABER',pct:30,color:'#3B82F6'},
-    {key:'hacer',label:'HACER',pct:30,color:'#22C55E'},
-    {key:'ser',  label:'SER',  pct:10,color:'#A855F7'},
-  ];
   let html='';
-  let notaFinal=0,notaFinalW=0;
 
-  PILLARS.forEach(function(pil){
-    const acts=(data.activities||[]).filter(function(a){
-      return a.pilar===pil.key||(pil.key==='saber'&&!a.pilar);
-    });
-    let pilProm=null;
-    if(acts.length){
-      const notas=acts.map(function(a){
-        // Auto y banco: usar getActNota igual que la planilla definitiva
-        if(a.auto||a.partBank||a.tareasBank||a.actType==='banco'){
+  if(isParciales){
+    // ── Modo semestral: P1 + (SABER/HACER/SER = P2) + P3 ──
+    const SECTIONS=[
+      {key:'p1',   label:'Parcial 1',  pct:30, color:'#3B82F6'},
+      {key:'saber',label:'SABER',      pct:null,color:'#3B82F6', sub:true},
+      {key:'hacer',label:'HACER',      pct:null,color:'#22C55E', sub:true},
+      {key:'ser',  label:'SER',        pct:null,color:'#A855F7', sub:true},
+      {key:'p3',   label:'Parcial 3',  pct:30, color:'#F59E0B'},
+    ];
+    SECTIONS.forEach(function(sec){
+      const acts=(data.activities||[]).filter(function(a){
+        return a.pilar===sec.key||(sec.key==='saber'&&!a.pilar);
+      });
+      if(!acts.length)return;
+      // Promedio del pilar (solo actividades no-banco-auto)
+      const pilNotas=acts.map(function(a){
+        if(a.auto||a.partBank||a.tareasBank||a.actType==='banco'||a.actType==='entregas'){
           return getActNota(data,a,stuId);
         }
         const buf=_svBuf[a.id];
         const obt=buf&&buf.obt!==''?Number(buf.obt):undefined;
-        const pos=a.posibles||0;
-        return(obt!==undefined&&pos)?calcNota(obt,pos):null;
+        return(obt!==undefined&&a.posibles)?calcNota(obt,a.posibles):null;
       }).filter(n=>n!==null);
-      if(notas.length)pilProm=notas.reduce((a,b)=>a+b,0)/notas.length;
+      const pilProm=pilNotas.length?Math.round(pilNotas.reduce((a,b)=>a+b,0)/pilNotas.length*10)/10:null;
+      const indent=sec.sub?'margin-left:12px;border-left:3px solid '+sec.color+';padding-left:8px':'';
+      html+='<div style="margin-bottom:14px;'+indent+'">';
+      html+='<div style="display:flex;align-items:center;justify-content:space-between;'+
+        'border-bottom:2px solid '+sec.color+';padding-bottom:4px;margin-bottom:8px">'+
+        '<span style="font-weight:700;font-size:'+(sec.sub?'12':'13')+'px;color:'+sec.color+'">';
+      if(!sec.sub&&sec.pct)html+=sec.label+' ('+sec.pct+'%)';
+      else if(sec.sub)html+='· '+sec.label;
+      else html+=sec.label;
+      html+='</span>'+
+        (pilProm!==null?'<strong class="pn '+notaCls(pilProm)+'">'+pilProm.toFixed(1)+'</strong>':
+        '<span style="color:var(--ink3)">Sin calificar</span>')+
+        '</div>';
+      acts.forEach(function(a){html+=_svRenderAct(a,stuId,data);});
+      html+='</div>';
+    });
+    // Cabecera P2
+    const p2Acts=(data.activities||[]).filter(function(a){
+      return ['saber','hacer','ser'].includes(a.pilar)||(a.pilar===undefined||a.pilar===null||a.pilar==='');
+    });
+    if(p2Acts.length){
+      // Insertar header P2 antes del primer sub-pilar
+      const p2Header='<div style="font-weight:700;font-size:13px;color:#6366F1;'+
+        'border-bottom:2px solid #6366F1;padding-bottom:4px;margin-bottom:8px;'+
+        'display:flex;align-items:center;justify-content:space-between">'+
+        '<span>Módulo Integrador (40%)</span></div>';
+      // Insertar antes del primer SABER
+      html=html.replace('<div style="margin-bottom:14px;margin-left:12px;border-left:3px solid #3B82F6',
+        '<div style="margin-bottom:4px">'+p2Header+'</div>'+
+        '<div style="margin-bottom:14px;margin-left:12px;border-left:3px solid #3B82F6');
     }
-    if(pilProm!==null){notaFinal+=pilProm*pil.pct;notaFinalW+=pil.pct;}
+
+  } else {
+    // ── Modo normal: SABER + HACER + SER + PxC ──
+    const PILLARS=[
+      {key:'saber',label:'SABER',pct:30,color:'#3B82F6'},
+      {key:'hacer',label:'HACER',pct:30,color:'#22C55E'},
+      {key:'ser',  label:'SER',  pct:10,color:'#A855F7'},
+    ];
+    PILLARS.forEach(function(pil){
+      const acts=(data.activities||[]).filter(function(a){
+        return a.pilar===pil.key||(pil.key==='saber'&&!a.pilar);
+      });
+      if(!acts.length)return;
+      const pilNotas=acts.map(function(a){
+        if(a.auto||a.partBank||a.tareasBank||a.actType==='banco'||a.actType==='entregas'){
+          return getActNota(data,a,stuId);
+        }
+        const buf=_svBuf[a.id];
+        const obt=buf&&buf.obt!==''?Number(buf.obt):undefined;
+        return(obt!==undefined&&a.posibles)?calcNota(obt,a.posibles):null;
+      }).filter(n=>n!==null);
+      const pilProm=pilNotas.length?Math.round(pilNotas.reduce((a,b)=>a+b,0)/pilNotas.length*10)/10:null;
+      html+='<div style="margin-bottom:14px">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;'+
+        'border-bottom:2px solid '+pil.color+';padding-bottom:4px;margin-bottom:8px">'+
+        '<span style="font-weight:700;font-size:13px;color:'+pil.color+'">'+pil.label+' ('+pil.pct+'%)</span>'+
+        (pilProm!==null?'<strong class="pn '+notaCls(pilProm)+'">'+pilProm.toFixed(1)+'</strong>':
+        '<span style="color:var(--ink3)">Sin calificar</span>')+
+        '</div>';
+      acts.forEach(function(a){html+=_svRenderAct(a,stuId,data);});
+      html+='</div>';
+    });
+
+    // PxC — solo lectura
+    const pxcData=((data.scores||{})[stuId]||{});
+    const pxcActs=(data.activities||[]).filter(function(a){return a.pilar==='pxc';});
+    const pxcNExt=pxcActs.length?getActNota(data,pxcActs[0],stuId):null;
+    // Calcular desde scores si existe
+    const pxcSc=pxcData['_pxc']||{};
+    const pxcN=pxcNExt!==null?pxcNExt:(pxcSc.obt!==undefined&&pxcSc.pos?calcNota(pxcSc.obt,pxcSc.pos):null);
     html+='<div style="margin-bottom:14px">'+
       '<div style="display:flex;align-items:center;justify-content:space-between;'+
-      'border-bottom:2px solid '+pil.color+';padding-bottom:4px;margin-bottom:8px">'+
-      '<span style="font-weight:700;font-size:13px;color:'+pil.color+'">'+pil.label+' ('+pil.pct+'%)</span>'+
-      '<span style="font-size:13px;font-weight:700;color:'+pil.color+'">'+
-      (pilProm!==null?'Prom: <strong class="pn '+notaCls(pilProm)+'">'+pilProm.toFixed(1)+'</strong>':'Sin calificar')+
-      '</span></div>'+
-      (acts.length?acts.map(function(a){return _svRenderAct(a,stuId,data);}).join('')
-        :'<div style="font-size:12px;color:var(--ink3);padding:4px 8px">Sin actividades</div>')+
-      '</div>';
-  });
-
-  // PxC — solo lectura
-  const pxcSc=((data.scores||{})[stuId]||{})['_pxc']||{};
-  const pxcN=(pxcSc.obt!==undefined&&pxcSc.pos)?calcNota(pxcSc.obt,pxcSc.pos):null;
-  if(pxcN!==null){notaFinal+=pxcN*10;notaFinalW+=10;}
-  html+='<div style="margin-bottom:14px">'+
-    '<div style="display:flex;align-items:center;justify-content:space-between;'+
-    'border-bottom:2px solid #F97316;padding-bottom:4px;margin-bottom:8px">'+
-    '<span style="font-weight:700;font-size:13px;color:#F97316">PxC (10%)</span>'+
-    '<span style="font-size:13px;font-weight:700">'+
-    (pxcN!==null?'<strong class="pn '+notaCls(pxcN)+'">'+pxcN.toFixed(1)+'</strong>'+
-    ' <span style="font-size:10px;color:var(--ink3)">(solo lectura)</span>':
-    '<span style="color:var(--ink3)">Sin calificar</span>')+
-    '</span></div></div>';
+      'border-bottom:2px solid #F97316;padding-bottom:4px;margin-bottom:8px">'+
+      '<span style="font-weight:700;font-size:13px;color:#F97316">PxC (10%)</span>'+
+      '<span style="font-size:13px;font-weight:700">'+
+      (pxcN!==null?'<strong class="pn '+notaCls(pxcN)+'">'+pxcN.toFixed(1)+'</strong>'+
+      ' <span style="font-size:10px;color:var(--ink3)">(solo lectura)</span>':
+      '<span style="color:var(--ink3)">Sin calificar</span>')+
+      '</span></div></div>';
+  }
 
   const bodyEl=document.getElementById('sv-body');
   if(bodyEl)bodyEl.innerHTML=html;
 
-  // Nota final: usar acumNota igual que la planilla definitiva
-  const co2=getC(_sv.cId);
+  // Nota final desde acumNota
+  const co2=getC(cId);
   const nf=acumNota(data,stuId,co2?.evalMode||'normal');
   const nfEl=document.getElementById('sv-nota-final');
   if(nfEl){nfEl.textContent=nf!==null?nf.toFixed(1):'—';nfEl.className='pn '+(nf!==null?notaCls(nf):'em');}
 }
+
 
 function _svRenderAct(act, stuId, data){
   if(!_svBuf[act.id])_svBuf[act.id]={obt:'',pos:'',posFixed:false,comments:[]};
@@ -11888,6 +12295,7 @@ function _svRenderAct(act, stuId, data){
   const isAttAuto  = !!(act.auto && !act.partBank && !act.tareasBank);
   const isBankAuto = !!(act.partBank || act.tareasBank);
   const isBancoCustom = act.actType === 'banco';
+  const isEntregasAct = act.actType === 'entregas';
   const pilar = act.pilar || 'saber';
 
   // Nota guardada (siempre desde datos reales)
@@ -11976,6 +12384,28 @@ function _svRenderAct(act, stuId, data){
       '<div id="sv-bar-' + act.id + '" style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:3px;transition:width .25s,background .25s"></div>' +
       '</div></div>';
 
+  } else if(isEntregasAct){
+    const entBuf=buf.entregas||{};
+    const entScores=((data.scores||{})[stuId]||{})[act.id]?.entregas||{};
+    panelContent='<div style="padding:8px 12px;display:flex;flex-direction:column;gap:6px">'+
+      (act.entregas||[]).map(function(e){
+        const stored=entBuf[e.id];
+        const curObt=stored!==undefined&&stored!==''?stored:(entScores[e.id]?.obt??'');
+        const nota=curObt!==''&&curObt!==undefined?(e.modoNota?Number(curObt):calcNota(Number(curObt),e.posibles||1)):null;
+        return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;border-bottom:1px solid var(--br)">'+
+          '<span style="flex:1;font-size:12px;font-weight:600">'+esc(e.name)+'</span>'+
+          '<span style="font-size:10px;color:var(--ink3)">'+e.peso+'%'+(e.modoNota?'':(e.posibles?' / '+e.posibles+' pts':''))+'</span>'+
+          '<input type="number" min="'+(e.modoNota?'1':'0')+'" '+(e.modoNota?'max="5" ':'')+
+          'step="'+(e.modoNota?'0.1':'0.5')+'" value="'+curObt+'" placeholder="'+(e.modoNota?'nota':'pts')+'"'+
+          ' data-act="'+act.id+'" data-eid="'+e.id+'" data-peso="'+e.peso+'"'+
+          ' data-modo="'+(e.modoNota?'1':'0')+'" data-pos="'+(e.posibles||1)+'"'+
+          ' style="width:64px;font-size:13px;font-weight:700;text-align:center;border:1px solid var(--br);border-radius:var(--rs);padding:4px 6px"'+
+          ' oninput="svEntregaInput(this)">'+
+          '<span id="sv-en-'+act.id+'-'+e.id+'" class="pn '+(nota!==null?notaCls(nota):'em')+'" style="font-size:12px;font-weight:700;min-width:32px;text-align:right">'+
+          (nota!==null?nota.toFixed(1):'—')+'</span>'+
+          '</div>';
+      }).join('')+
+      '</div>';
   } else {
     // Actividad normal — input editable
     const obt = buf.obt !== '' ? Number(buf.obt) : undefined;
@@ -12027,6 +12457,42 @@ function _svRenderAct(act, stuId, data){
 
 
 // Ajustar banco de participación o tareas desde la vista de estudiante
+function svEntregaInput(inp){
+  const actId=inp.dataset.act;
+  const entregaId=inp.dataset.eid;
+  const peso=Number(inp.dataset.peso);
+  const modoNota=inp.dataset.modo==='1';
+  const posibles=Number(inp.dataset.pos)||1;
+  const val=inp.value;
+  if(!_svBuf[actId])_svBuf[actId]={obt:'',pos:'',posFixed:false,comments:[],entregas:{}};
+  if(!_svBuf[actId].entregas)_svBuf[actId].entregas={};
+  _svBuf[actId].entregas[entregaId]=val===''?'':Number(val);
+  _svDirty=true;
+  const nota=val===''?null:(modoNota?Number(val):calcNota(Number(val),posibles));
+  const el=document.getElementById('sv-en-'+actId+'-'+entregaId);
+  if(el){el.textContent=nota!==null?nota.toFixed(1):'—';el.className='pn '+(nota!==null?notaCls(nota):'em');}
+  const data=getGrD(_sv.cId,_sv.asig,_sv.per);
+  const act=(data.activities||[]).find(function(a){return a.id===actId;});
+  if(!act||!act.entregas)return;
+  const entScores=(((data.scores||{})[_sv.stuId]||{})[actId]||{}).entregas||{};
+  let pesoCalif=0,notaSum=0;
+  act.entregas.forEach(function(e){
+    const raw=(_svBuf[actId]?.entregas||{})[e.id];
+    const obt=raw!==undefined&&raw!==''?raw:(entScores[e.id]?.obt??'');
+    if(obt===''||obt===undefined||obt===null)return;
+    const n=e.modoNota?Number(obt):calcNota(Number(obt),e.posibles||1);
+    if(n===null)return;
+    pesoCalif+=e.peso;notaSum+=n*e.peso;
+  });
+  const notaFinal=pesoCalif>0?Math.round(notaSum/pesoCalif*100)/100:null;
+  const panel=document.getElementById('sv-edit-'+actId);
+  if(panel&&panel.previousElementSibling){
+    const hSpan=panel.previousElementSibling.querySelector('.pn');
+    if(hSpan){hSpan.textContent=notaFinal!==null?notaFinal.toFixed(1):'—';hSpan.className='pn '+(notaFinal!==null?notaCls(notaFinal):'em');}
+  }
+}
+
+
 function svBankAdj(actId, pilar, isPartBank, delta){
   const data=getGrD(_sv.cId,_sv.asig,_sv.per);
   const bKey=(isPartBank?'participacion_':'tareas_')+pilar;
@@ -12148,7 +12614,16 @@ function svSave(){
     if(!act)return;
     const hasCmts=(buf.comments&&buf.comments.length>0);
     const hasObt=(buf.obt!==''&&buf.obt!==undefined);
-    if(!hasObt&&!hasCmts){
+    if(act.actType==='entregas'){
+      if(!data.scores[_sv.stuId][actId])data.scores[_sv.stuId][actId]={};
+      if(!data.scores[_sv.stuId][actId].entregas)data.scores[_sv.stuId][actId].entregas={};
+      Object.keys(buf.entregas||{}).forEach(function(eId){
+        const v=(buf.entregas||{})[eId];
+        if(v===undefined||v==='')delete data.scores[_sv.stuId][actId].entregas[eId];
+        else data.scores[_sv.stuId][actId].entregas[eId]={obt:Number(v)};
+      });
+      if(hasCmts)data.scores[_sv.stuId][actId].comments=buf.comments;
+    } else if(!hasObt&&!hasCmts){
       // Sin puntos ni comentarios — borrar el entry si existe
       delete data.scores[_sv.stuId][actId];
     } else if(!hasObt&&hasCmts){
