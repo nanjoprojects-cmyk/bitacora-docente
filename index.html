@@ -3568,13 +3568,13 @@ function renderGrades(){
           }
         }
         const cellTitle=isBankAuto
-          ?'Banco — '+esc(a.name)+' (solo lectura, edita desde el banco)'
-          :'Calculada automáticamente desde asistencia — solo lectura';
+          ?'Banco — '+esc(a.name)+''
+          :'Calculada automáticamente desde asistencia';
         // Push live bank nota to notas[] (was skipped above for bank autos)
         if(isBankAuto&&bankNota!==null){
           notas.push(bankNota);
         }
-        cells+='<td class="gtd-pts" title="'+cellTitle+'">'+
+        cells+='<td class="gtd-pts" style="cursor:pointer" onclick="openActEntry(\''+a.id+'\''+',\''+cId+'\''+',\''+esc(asig)+'\''+',\''+per+'\''+',\''+st.id+'\')" title="'+cellTitle+'">'+
           '<span class="act-wm">'+esc(a.name)+'</span>'+
           '<div style="text-align:center;padding:2px 0">'+
           '<span class="pn '+(isBankAuto?(bankHasData?notaCls(bankNota):'lo'):(nota!==null?notaCls(nota):'em'))+'" style="font-size:13px">'+
@@ -3615,7 +3615,8 @@ function renderGrades(){
       '<td class="gtd-name" style="position:sticky;left:38px;z-index:1;white-space:nowrap">'+
       '<button class="seg-ico" onclick="openFicha(\''+st.id+'\',\''+esc(st.nombre)+'\',\''+cId+'\')" title="Observaciones y llamados">'+
       (getSeg(st.id).llamados.length?'<span class="seg-dot"></span>':'')+
-      '📝</button> '+esc(st.nombre)+'</td>'+cells+
+      '📝</button> '+esc(st.nombre)+
+      '</td>'+cells+
       '<td class="gtd-prom"><span class="pn '+(prom!==null?notaCls(prom):'em')+'" style="font-size:14px">'+(prom!==null?prom.toFixed(1):'—')+'</span></td>'+
     '</tr>';
   });
@@ -3963,7 +3964,8 @@ function renderResumen(content,data,studs,cId,asig,per){
         '<td class="gtd-name" style="position:sticky;left:38px;z-index:1;white-space:nowrap">'+
           '<button class="seg-ico" onclick="openFicha(\''+st.id+'\',\''+esc(st.nombre)+'\',\''+cId+'\')" title="Observaciones y llamados">'+
           (getSeg(st.id).llamados.length?'<span class="seg-dot"></span>':'')+
-          '📝</button> '+esc(st.nombre)+'</td>'+
+          '📝</button> '+esc(st.nombre)+
+        '</td>'+
         // P1
         '<td class="gtd-prom">'+n(vP1)+'</td>'+
         '<td class="gtd-prom">'+wCell(vP1,0.3)+'</td>'+
@@ -4035,7 +4037,9 @@ function renderResumen(content,data,studs,cId,asig,per){
         '<td class="gtd-name" style="position:sticky;left:38px;z-index:1;white-space:nowrap">'+
         '<button class="seg-ico" onclick="openFicha(\''+st.id+'\',\''+esc(st.nombre)+'\',\''+cId+'\')" title="Observaciones y llamados">'+
         (getSeg(st.id).llamados.length?'<span class="seg-dot"></span>':'')+
-        '📝</button> '+esc(st.nombre)+'</td>'+cells+
+        '📝</button> '+
+        '<span style="cursor:pointer;border-bottom:1px dotted var(--ac)" onclick="openStuView(\''+st.id+'\',\''+cId+'\',\''+esc(asig)+'\',\''+per+'\')" title="Ver todas las notas">'+esc(st.nombre)+'</span>'+
+        '</td>'+cells+
         '<td class="gtd-def">'+finalCell+'</td>'+
       '</tr>';
     });
@@ -7390,221 +7394,176 @@ const HELP_SECTIONS=[
   {
     icon:'🚀',title:'Primeros pasos',
     content:`
-      <h3>Bienvenido a Bitácora Docente</h3>
-      <p>Esta aplicación le permite gestionar su labor docente desde un solo lugar: horarios, registro de clases, asistencia y calificaciones.</p>
+      <h3>Cómo empezar</h3>
+      <p>Siga estos pasos la primera vez que abre la app. Después solo necesita iniciar sesión y ya todo estará listo.</p>
       <div class="help-card">
-        <div class="help-step"><span class="help-num">1</span><div><strong>Configure su perfil</strong><br>Vaya a <em>⚙️ Configuración → Perfil</em> e ingrese su nombre, institución y año lectivo.</div></div>
-        <div class="help-step"><span class="help-num">2</span><div><strong>Cree sus cursos</strong><br>En <em>⚙️ Configuración → Cursos</em> agregue cada grupo a cargo con su nombre, grado y asignaturas.</div></div>
-        <div class="help-step"><span class="help-num">3</span><div><strong>Configure los períodos</strong><br>En <em>⚙️ Configuración → Períodos</em> defina la plantilla de períodos con nombre, fecha de inicio y fecha de fin. Use <strong>Aplicar a todos</strong> para asignarla a todos los cursos. Para grados semestrales use el botón <strong>Modo semestral</strong> (2 semestres). <strong>Importante:</strong> al ingresar las fechas de inicio y fin, la app detecta automáticamente el período activo al abrir — así no necesita seleccionarlo manualmente cada vez, ni en cursos por períodos ni en cursos semestrales.</div></div>
-        <div class="help-step"><span class="help-num">4</span><div><strong>Agregue estudiantes</strong><br>En <em>⚙️ Configuración → Estudiantes</em> seleccione el curso y período, y agregue los estudiantes uno a uno o en lote (pegando una lista). También puede subir una foto de perfil desde <em>⚙️ Configuración → Perfil</em>.</div></div>
-        <div class="help-step"><span class="help-num">5</span><div><strong>Configure sus horarios</strong><br>En <em>⚙️ Configuración → Horarios</em> defina los tipos de horario (A, B, C, Especial) con sus espacios y tiempos. Use <strong>＋ Nuevo tipo</strong> para crear un horario adicional (ej. Sábado) y eliminarlo cuando no lo necesite. En <em>Asignación Semanal</em> use <strong>＋ Sábado</strong> o <strong>＋ Domingo</strong> si trabaja esos días.</div></div>
-        <div class="help-step"><span class="help-num">6</span><div><strong>¡Listo para usar!</strong><br>Cada mañana abra <em>🕐 Mi Día</em>, seleccione el tipo de horario y navegue directamente a cada clase.</div></div>
+        <div class="help-step"><span class="help-num">1</span><div><strong>Configure su perfil</strong><br>Vaya a <em>⚙️ Configuración → 👤 Perfil</em> y escriba su nombre, cargo e institución. Esta información aparecerá en los informes que genere.</div></div>
+        <div class="help-step"><span class="help-num">2</span><div><strong>Cree sus cursos</strong><br>En <em>⚙️ Configuración → 📚 Cursos</em> agregue cada curso que atiende: nombre, grado y asignaturas. Puede crear tantos como necesite.</div></div>
+        <div class="help-step"><span class="help-num">3</span><div><strong>Configure los períodos</strong><br>En <em>⚙️ Configuración → 📅 Períodos</em> defina los períodos del año con sus fechas de inicio y fin. Si les asigna fechas exactas, la app detectará automáticamente cuál está activo cada vez que la abra — sin que usted tenga que seleccionarlo. Para grados semestrales use el botón <strong>Modo semestral</strong>.</div></div>
+        <div class="help-step"><span class="help-num">4</span><div><strong>Agregue estudiantes</strong><br>En <em>⚙️ Configuración → 👥 Estudiantes</em> escriba la lista de estudiantes de cada curso. Puede copiar y pegar desde un documento de texto, uno por línea.</div></div>
+        <div class="help-step"><span class="help-num">5</span><div><strong>Configure sus horarios</strong><br>En <em>⚙️ Configuración → 🕐 Horarios</em> cree su horario semanal. Esto le permitirá ver en Mi Día qué clase tiene en este momento y acceder rápido a cada módulo.</div></div>
+        <div class="help-step"><span class="help-num">✅</span><div><strong>¡Listo para usar!</strong><br>Cada mañana abra la app y Mi Día le mostrará su clase actual. Desde allí puede ir directo a registrar asistencia, notas o un apunte en la bitácora.</div></div>
       </div>
     `
   },
-    {
-    icon:'🕐',title:'Mi Día',
+  {
+    icon:'📆',title:'Mi Día',
     content:`
-      <h3>Su agenda diaria en tiempo real</h3>
-      <p>La pantalla <strong>Mi Día</strong> muestra su jornada completa según el tipo de horario del día.</p>
+      <h3>Su punto de partida diario</h3>
+      <p>Mi Día es la pantalla principal. Muestra su horario de hoy, resalta la clase en curso y da acceso rápido a cada función.</p>
       <div class="help-card">
-        <div class="help-step"><span class="help-num">💡</span><div><strong>Seleccionar horario</strong><br>Use el selector en la parte superior para elegir entre Horario A, B, C o Especial.</div></div>
-        <div class="help-step"><span class="help-num">🟦</span><div><strong>Espacio activo</strong><br>El espacio en curso aparece resaltado con la etiqueta <strong>● AHORA</strong> y una cuenta regresiva de minutos.</div></div>
-        <div class="help-step"><span class="help-num">🔗</span><div><strong>Acceso rápido</strong><br>Cada curso tiene tres botones: <em>📋 Bitácora</em>, <em>✅ Asistencia</em> y <em>📊 Notas</em> para ir directo con el curso preseleccionado.</div></div>
-        <div class="help-step"><span class="help-num">📋</span><div><strong>Mi Asignación</strong><br>La pestaña <em>Mi Asignación</em> muestra su horario semanal completo en una tabla de consulta rápida — sin necesidad de ir a Configuración.</div></div>
-        <div class="help-step"><span class="help-num">🗓</span><div><strong>Mis Horarios</strong><br>La pestaña <em>Mis Horarios</em> le permite consultar en modo solo lectura todos los tipos de horario configurados (A, B, C, Especial y personalizados), con sus espacios y horarios. Para editar vaya a ⚙️ Configuración → Horarios.</div></div>
-        <div class="help-step"><span class="help-num">☕</span><div><strong>Descanso y Hora Cero</strong><br>Aparecen diferenciados (ámbar y morado). No hacen parte de su asignación personal.</div></div>
-        <div class="help-step"><span class="help-num">🌅</span><div><strong>Fines de semana</strong><br>En sábados y domingos la app muestra un mensaje de descanso por defecto. Si trabaja esos días, cree un tipo de horario personalizado en ⚙️ Config → Horarios (＋ Nuevo tipo) y selecciónelo manualmente en el desplegable de Mi Día. En <em>Asignación Semanal</em> use ＋ Sábado o ＋ Domingo para agregar su asignación de esos días.</div></div>
+        <div class="help-step"><span class="help-num">🕐</span><div><strong>Clase en curso</strong><br>El espacio activo aparece resaltado. Si tiene varias horas seguidas del mismo curso, aparece agrupado. El reloj en la barra superior le indica la hora actual.</div></div>
+        <div class="help-step"><span class="help-num">📋</span><div><strong>Acceso rápido desde cada clase</strong><br>Cada espacio del horario tiene tres botones: uno para abrir la bitácora de ese curso, otro para la asistencia y otro para las calificaciones. Así llega directo sin tener que buscar el curso.</div></div>
+        <div class="help-step"><span class="help-num">📅</span><div><strong>Selector de período</strong><br>En la parte superior puede elegir el período activo. Si configuró fechas en sus períodos, la app lo selecciona automáticamente al abrir. Puede cambiarlo manualmente cuando necesite revisar otro período.</div></div>
+        <div class="help-step"><span class="help-num">📊</span><div><strong>Mi Asignación</strong><br>La pestaña Mi Asignación muestra todos sus cursos y asignaturas con un resumen del estado de asistencia y notas de cada uno.</div></div>
+        <div class="help-step"><span class="help-num">🗓</span><div><strong>Mis Horarios</strong><br>La pestaña Mis Horarios muestra la vista semanal completa de todos sus horarios configurados. Puede alternar entre Horario A, B, C o Especial según la jornada del día.</div></div>
+        <div class="help-step"><span class="help-num">🌙</span><div><strong>Fines de semana</strong><br>En sábados y domingos la app muestra un mensaje de descanso. Si trabaja esos días, puede crear un tipo de horario especial en Configuración → Horarios.</div></div>
       </div>
     `
-  }
-  ,
+  },
   {
     icon:'📋',title:'Bitácora',
     content:`
-      <h3>Registro de sus clases</h3>
-      <p>La bitácora es el diario de su labor docente. Cada registro corresponde a una clase o evento académico.</p>
+      <h3>Registro de lo que pasa en clase</h3>
+      <p>La bitácora es su diario pedagógico digital. Registre qué hizo en cada clase, eventos institucionales, imprevistos y cualquier anotación relevante.</p>
       <div class="help-card">
-        <div class="help-step"><span class="help-num">＋</span><div><strong>Nuevo registro</strong><br>Haga clic en el botón <em>＋ Registro</em> o en el nombre del curso en la barra lateral. Complete la fecha, curso, asignatura, tipo de clase, descripción y estado.</div></div>
-        <div class="help-step"><span class="help-num">📂</span><div><strong>Tipos de registro en la bitácora</strong><br>Al seleccionar el tipo de registro aparece una descripción de ayuda bajo el selector. Los cinco tipos son: <strong>🟢 Clase</strong> — actividad académica ejecutada con normalidad. <strong>🟣 Evento institucional</strong> — actividad del colegio que reemplazó la clase (izada, semana temática, proyecto). <strong>🟠 Imprevisto externo</strong> — situación fuera del control del docente (paro sindical, corte de servicios, visita no anunciada). <strong>🔵 Novedad de aula</strong> — algo interno alteró la dinámica de la clase (grupo incompleto, evaluación de otra área, problema de disciplina). <strong>🟡 Ausencia docente</strong> — el docente no pudo asistir por permiso, incapacidad, calamidad o comisión.</div></div>
-        <div class="help-step"><span class="help-num">📊</span><div><strong>Resumen comparativo de registros</strong><br>El botón <em>📊 Resumen</em> en la barra superior muestra un panel con la distribución de todos los registros por tipo: un gráfico circular global y barras apiladas por curso. Permite visualizar de un vistazo cuántas clases se ejecutaron, cuántos imprevistos hubo y cuáles cursos tuvieron más interrupciones.</div></div>
-        <div class="help-step"><span class="help-num">🗂</span><div><strong>Vista General</strong><br>Muestra todos los registros de todos los cursos ordenados por fecha. Use el <strong>selector de curso</strong> para filtrar por un curso específico. Combine también con los filtros de Tipo y Período para búsquedas precisas. El buscador de texto libre filtra simultáneamente en descripción, observaciones y asignatura.</div></div>
-        <div class="help-step"><span class="help-num">📚</span><div><strong>Vista por curso</strong><br>Haga clic en el nombre de un curso en la barra lateral para ver solo sus registros.</div></div>
-        <div class="help-step"><span class="help-num">⏳</span><div><strong>Pendientes</strong><br>Los registros marcados como "Pendiente" aparecen aquí para hacer seguimiento.</div></div>
-        <div class="help-step"><span class="help-num">↩</span><div><strong>Deshacer / Rehacer</strong><br>Use los botones en la barra superior para revertir cambios. Haga clic en la flecha ▾ para ver el historial y escoger hasta qué punto deshacer.</div></div>
-        <div class="help-step"><span class="help-num">🖨️</span><div><strong>Imprimir registros</strong><br>Cuando está en la vista de un curso específico, aparece el botón 🖨️ Imprimir en la barra superior para imprimir los registros activos en pantalla.</div></div>
+        <div class="help-step"><span class="help-num">✏️</span><div><strong>Nuevo registro</strong><br>Haga clic en el botón <strong>+ Nuevo registro</strong>. Seleccione el curso, la asignatura, el tipo de registro, escriba la descripción de lo que ocurrió y guarde. Es así de sencillo.</div></div>
+        <div class="help-step"><span class="help-num">🏷</span><div><strong>Tipos de registro</strong><br>Puede clasificar cada entrada como: <strong>Clase</strong> (clase dictada), <strong>Evento institucional</strong> (acto, reunión, salida), <strong>Imprevisto externo</strong> (paro, lluvia, corte de luz), <strong>Novedad de aula</strong> (situación dentro del salón) o <strong>Ausencia docente</strong> (cuando usted falta). Al seleccionar el tipo aparece una descripción de ayuda.</div></div>
+        <div class="help-step"><span class="help-num">🗂</span><div><strong>Vista General</strong><br>Muestra todos los registros de todos sus cursos juntos, ordenados por fecha. Use el <strong>selector de curso</strong> para filtrar por un solo curso, los botones de tipo para filtrar por categoría, y el buscador para encontrar algo específico. Puede combinar todos los filtros a la vez.</div></div>
+        <div class="help-step"><span class="help-num">📚</span><div><strong>Vista por curso</strong><br>Haga clic en el nombre de un curso en la barra lateral izquierda para ver solo los registros de ese curso.</div></div>
+        <div class="help-step"><span class="help-num">⏳</span><div><strong>Pendientes</strong><br>Los registros marcados como "Pendiente" aparecen aquí agrupados para que no se le olvide darles seguimiento.</div></div>
+        <div class="help-step"><span class="help-num">📊</span><div><strong>Resumen comparativo</strong><br>El botón <em>Resumen</em> muestra una gráfica con el conteo de registros por tipo para el curso seleccionado. Útil para ver de un vistazo qué tan completa está su bitácora.</div></div>
+        <div class="help-step"><span class="help-num">🖨️</span><div><strong>Imprimir registros</strong><br>Cuando está en la vista de un curso específico, aparece el botón 🖨️ Imprimir para generar una versión imprimible de los registros activos en pantalla.</div></div>
       </div>
     `
   },
   {
     icon:'✅',title:'Asistencia',
     content:`
-      <h3>Registro de asistencia</h3>
-      <p>Registre la asistencia de cada clase por curso, asignatura y período.</p>
+      <h3>Control de asistencia clase por clase</h3>
       <div class="help-card">
-        <div class="help-step"><span class="help-num">📅</span><div><strong>Agregar una fecha</strong><br>Seleccione el curso, asignatura y período, luego haga clic en <em>＋ Fecha</em> y elija el día de clase.</div></div>
-        <div class="help-step"><span class="help-num">✅</span><div><strong>Marcar asistencia</strong><br>Haga clic en la celda de cada estudiante para avanzar en el ciclo de estados: <strong>— → P → A → T → J → —</strong>. Los estados son: <strong>P</strong> (Presente), <strong>A</strong> (Ausente), <strong>T</strong> (Tarde), <strong>J</strong> (Justificado), <strong>—</strong> (sin registro). Para <strong>limpiar una celda directamente</strong> a — sin pasar por todos los estados, use <em>clic derecho</em> en PC o <em>mantener presionado</em> en tablet.</div></div>
-        <div class="help-step"><span class="help-num">📊</span><div><strong>Estadísticas automáticas</strong><br>La planilla calcula automáticamente totales, porcentaje de asistencia y nota de asistencia por estudiante.</div></div>
-        <div class="help-step"><span class="help-num">🗑</span><div><strong>Eliminar una fecha</strong><br>Use el botón <em>✕</em> en el encabezado de la columna. La app pedirá confirmación antes de borrar.</div></div>
-        <div class="help-step"><span class="help-num">💾</span><div><strong>Guardar</strong><br>Haga clic en <em>Guardar asistencia</em> cuando termine. El indicador naranja avisa si hay cambios sin guardar.</div></div>
-        <div class="help-step"><span class="help-num">⚡</span><div><strong>Asistencia masiva</strong><br>Use la barra <em>Asistencia masiva</em> para marcar a todos los estudiantes como Presentes o Ausentes de una sola vez en la fecha seleccionada. Las fechas están ordenadas de la más reciente a la más antigua para facilitar el registro inmediato.</div></div>
-        <div class="help-step"><span class="help-num">📊</span><div><strong>Resumen de asistencia</strong><br>El botón <em>📊 Resumen</em> muestra una vista consolidada de todos los cursos y asignaturas del período seleccionado, con barras de progreso por estudiante.</div></div>
-        <div class="help-step"><span class="help-num">🖨️</span><div><strong>Imprimir planilla</strong><br>El botón <em>🖨️ Imprimir</em> genera una vista imprimible del curso y asignatura activos, con encabezado completo: institución, docente, curso, asignatura, período y número de clases.</div></div>
-        <div class="help-step"><span class="help-num">⬇</span><div><strong>Exportar a Excel</strong><br>El botón <em>⬇ Excel</em> abre el panel de exportación preconfigurado con el curso y período activos. Si el curso tiene varias asignaturas, puede filtrar a una sola antes de exportar.</div></div>
-        <div class="help-step"><span class="help-num">🎨</span><div><strong>Color de columna</strong><br>Haga clic en el ícono 💬 del encabezado de cualquier fecha para asignarle un color y un comentario (ej: Evaluación, Festivo, Refuerzo). La columna entera se resalta al instante y el cambio se guarda automáticamente.</div></div>
-        <div class="help-step"><span class="help-num">🟡</span><div><strong>Alerta ámbar — inasistencias justificadas</strong><br>Si un estudiante acumula más del 30% de inasistencias <strong>justificadas</strong>, su fila se resalta en morado con el distintivo <em>💜 +30% J</em>. Esto es informativo, no disciplinario: la nota de asistencia no se ve afectada, pero puede ser señal de una situación que merece seguimiento.</div></div>
+        <div class="help-step"><span class="help-num">📅</span><div><strong>Agregar una fecha de clase</strong><br>Seleccione el curso, la asignatura y el período. Luego haga clic en <strong>+ Fecha</strong> para agregar la clase de hoy (o cualquier fecha pasada). Puede agregar varias fechas a la vez.</div></div>
+        <div class="help-step"><span class="help-num">✅</span><div><strong>Marcar asistencia</strong><br>Toque la celda de cada estudiante para cambiar su estado. Cada toque avanza en el ciclo: <strong>— → P → A → T → J → —</strong>. Los estados son: <strong>P</strong> (Presente), <strong>A</strong> (Ausente), <strong>T</strong> (Tarde), <strong>J</strong> (Justificado), <strong>—</strong> (sin registro). Para <strong>limpiar una celda directamente</strong>, use <em>clic derecho</em> en computador o <em>mantener presionado</em> en tablet — limpia al instante sin pasar por todos los estados.</div></div>
+        <div class="help-step"><span class="help-num">📊</span><div><strong>Cálculo automático</strong><br>La planilla calcula sola el total de inasistencias, el porcentaje de asistencia y la nota de asistencia de cada estudiante. No tiene que hacer nada extra.</div></div>
+        <div class="help-step"><span class="help-num">⬆️</span><div><strong>Asistencia masiva</strong><br>Use la barra superior de la planilla para marcar a todos como Presentes de una vez y luego corregir solo los ausentes. Ahorra tiempo cuando la mayoría asistió.</div></div>
+        <div class="help-step"><span class="help-num">⚠️</span><div><strong>Alertas de inasistencia</strong><br>Si un estudiante supera el 30% de inasistencias no justificadas, su fila se resalta en naranja. Si supera el 30% incluyendo justificadas, aparece en morado. Esto le ayuda a detectar situaciones de riesgo a tiempo.</div></div>
+        <div class="help-step"><span class="help-num">💬</span><div><strong>Comentarios en fechas</strong><br>Haga clic en el ícono 💬 del encabezado de una fecha para agregarle un color y un comentario (por ejemplo: Evaluación, Festivo, Refuerzo). La columna se colorea para identificarla visualmente.</div></div>
+        <div class="help-step"><span class="help-num">📝</span><div><strong>Nota en celda J</strong><br>Al marcar a un estudiante como <strong>J</strong> (Justificado) puede agregar una nota explicando el motivo. Haga clic derecho sobre la celda J para acceder a esa opción.</div></div>
+        <div class="help-step"><span class="help-num">🔃</span><div><strong>Otras opciones</strong><br>La barra superior tiene botones para: invertir el orden de fechas (más reciente primero o al final), bloquear la edición a una fecha específica para evitar cambios accidentales, imprimir la planilla y exportarla a hoja de cálculo.</div></div>
       </div>
     `
   },
   {
     icon:'📊',title:'Calificaciones',
     content:`
-      <h3>Planilla de notas</h3>
-      <p>Las calificaciones se organizan en cuatro pilares con sus respectivos pesos:</p>
-      <div class="help-card" style="margin-bottom:12px">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div style="padding:8px 10px;background:rgba(59,130,246,.08);border-radius:6px;font-size:13px"><strong>SABER</strong> — 30%<br><span style="font-size:11px;color:var(--ink3)">Conocimiento teórico</span></div>
-          <div style="padding:8px 10px;background:rgba(16,185,129,.08);border-radius:6px;font-size:13px"><strong>HACER</strong> — 30%<br><span style="font-size:11px;color:var(--ink3)">Aplicación práctica</span></div>
-          <div style="padding:8px 10px;background:rgba(245,158,11,.08);border-radius:6px;font-size:13px"><strong>SER</strong> — 30%<br><span style="font-size:11px;color:var(--ink3)">Actitud y convivencia</span></div>
-          <div style="padding:8px 10px;background:rgba(139,92,246,.08);border-radius:6px;font-size:13px"><strong>PxC</strong> — 10%<br><span style="font-size:11px;color:var(--ink3)">Prueba por Competencias</span></div>
-        </div>
-      </div>
+      <h3>Notas organizadas por pilares</h3>
+      <p>Las calificaciones se organizan en cuatro componentes con sus pesos:</p>
+      <ul style="margin:6px 0 10px 18px;font-size:13px">
+        <li><strong>SABER (30%)</strong> — conocimientos, pruebas, talleres teóricos</li>
+        <li><strong>HACER (30%)</strong> — actividades prácticas, trabajos, desempeño</li>
+        <li><strong>SER (10%)</strong> — actitud, participación, compromisos</li>
+        <li><strong>PxC (10%)</strong> — Prueba por Competencias</li>
+      </ul>
+      <p>La fórmula es: <strong>Nota = (Puntos obtenidos ÷ Puntos posibles) × 4 + 1</strong></p>
       <div class="help-card">
-        <div class="help-step"><span class="help-num">＋</span><div><strong>Agregar actividad</strong><br>Seleccione el pilar y haga clic en <em>＋ Actividad</em>. Asigne nombre, asignatura, puntos posibles, descripción e indicador de evaluación. Puede copiarla a otros cursos usando la sección colapsable <em>📋 Copiar a otros cursos</em> — cada curso tiene su propio selector de asignatura destino.</div></div>
-        <div class="help-step"><span class="help-num">✏️</span><div><strong>Editar actividad</strong><br>En el encabezado de cada actividad aparece el botón ✏️ que abre un modal completo para editar nombre, pilar, puntos, descripción e indicador de evaluación. Los cambios se guardan de inmediato sin afectar las calificaciones ya ingresadas.</div></div>
-        <div class="help-step"><span class="help-num">📥</span><div><strong>Importar actividad desde otro curso</strong><br>Al crear una nueva actividad, despliegue el panel <em>📥 Importar datos desde otra actividad</em>. Seleccione el curso origen (los que comparten la misma asignatura aparecen primero), la asignatura y la actividad deseada. Al pulsar <em>↓ Traer datos</em> se rellenan automáticamente todos los campos del formulario, que puede ajustar antes de guardar.</div></div>
-        <div class="help-step"><span class="help-num">📌</span><div><strong>Indicador de evaluación</strong><br>Al crear o editar una actividad puede ingresar un <em>Indicador de evaluación</em> redactado en infinitivo (ej: «resolver ecuaciones de primer grado»). Este indicador se usa automáticamente para generar la <em>Voz del Desempeño</em> en el informe de cada estudiante.</div></div>
-        <div class="help-step"><span class="help-num">💬</span><div><strong>Descripción de actividad</strong><br>Haga clic en el ícono 💬 en el encabezado de cualquier actividad para ver o editar su descripción.</div></div>
-        <div class="help-step"><span class="help-num">✏️</span><div><strong>Ingresar notas</strong><br>Haga clic en la celda de cada estudiante y escriba los puntos obtenidos. La nota se calcula automáticamente con la fórmula <em>(obt/pos)×4+1</em>.</div></div>
-        <div class="help-step"><span class="help-num">🎯</span><div><strong>Modo nota directa</strong><br>Si ya tiene las notas calculadas (ej: registros en papel) y quiere ingresarlas directamente sin calcular puntos, pulse el botón <strong>📝 Modo: Pts</strong> en la barra superior de la ventana de notas. Cambiará a <strong>🎯 Modo: Nota</strong> y podrá digitar la nota (1.0–5.0) directamente. El sistema calcula y guarda los puntos obtenidos automáticamente usando la inversa de la fórmula: <em>obt = (nota−1)×pos÷4</em>. El campo muestra en pequeño los puntos equivalentes para que pueda verificar. Pulse el botón nuevamente para volver al modo de puntos.</div></div>
-        <div class="help-step"><span class="help-num">📋</span><div><strong>Resumen</strong><br>La pestaña <em>Resumen</em> muestra la nota definitiva de cada estudiante con el cálculo ponderado de los cuatro pilares.</div></div>
-        <div class="help-step"><span class="help-num">💾</span><div><strong>Guardar</strong><br>Use <em>Guardar calificaciones</em>. El indicador naranja avisa si hay cambios pendientes.</div></div>
-        <div class="help-step"><span class="help-num">📋</span><div><strong>Planilla Definitiva</strong><br>La pestaña <em>Planilla Definitiva</em> muestra el promedio acumulado de cada pilar, su aporte ponderado y la nota final en tiempo real. Mientras no estén registradas todas las actividades, la nota aparece como <em>parcial</em>.</div></div>
-        <div class="help-step"><span class="help-num">🎯</span><div><strong>Prueba por Competencias (PxC)</strong><br>El pilar PxC (10%) cuenta con un sistema propio de calificación. Primero pulse <em>📝 Configurar PxC</em> para definir las preguntas: cada pregunta tiene hasta <strong>4 opciones (A, B, C, D)</strong> con puntaje independiente. El mayor puntaje de cada pregunta define su máximo. El nivel de dificultad (Básico → Reto) se sugiere automáticamente según el peso relativo de la pregunta, pero puede ajustarlo manualmente.</div></div>
-        <div class="help-step"><span class="help-num">📊</span><div><strong>Calificar PxC</strong><br>Pulse <em>🎯 Calificar</em> para abrir la tabla de calificación. Cada fila es un estudiante; cada columna una pregunta (P1, P2…). Seleccione en el desplegable la opción que marcó cada estudiante (A, B, C, D o —). La nota y los puntos se actualizan en tiempo real. Si una estudiante no responde ninguna pregunta, la casilla queda en <strong>—</strong> (sin nota).</div></div>
-        <div class="help-step"><span class="help-num">📋</span><div><strong>Copiar PxC a otros cursos</strong><br>Desde <em>📝 Configurar PxC</em> pulse <em>📋 Copiar a cursos…</em> para aplicar la misma configuración de preguntas a otros cursos/asignaturas/períodos. Seleccione los destinos con las casillas y pulse <em>Copiar a seleccionados</em>.</div></div>
-        <div class="help-step"><span class="help-num">🔀</span><div><strong>Modo evaluación por parciales</strong><br>Para cursos semestrales, active <em>"Evaluación con parciales"</em> en ⚙️ Config → Cursos al crear o editar el curso. Esto reemplaza PxC por <strong>Parcial 1 (30%)</strong> y <strong>Parcial 3 (30%)</strong>; SABER+HACER+SER quedan en el 40% restante. Las pestañas cambian automáticamente al seleccionar ese curso.</div></div>
-        <div class="help-step"><span class="help-num">💬</span><div><strong>Comentarios en notas individuales</strong><br>En cada celda de calificación aparece un pequeño ícono 💬 debajo del número. Haga clic para agregar un comentario sobre esa nota para ese estudiante específico (ej: "Entregó tarde", "Excelente presentación"). El comentario se guarda con fecha y aparece en el Informe de Desempeño de la ficha del estudiante. El ícono se vuelve azul cuando hay un comentario.</div></div>
+        <div class="help-step"><span class="help-num">➕</span><div><strong>Agregar actividad</strong><br>Seleccione el pilar (SABER, HACER, SER) y haga clic en <strong>+ Actividad</strong>. Asígnele un nombre, los puntos que vale y una descripción opcional. También puede importarla desde otro curso.</div></div>
+        <div class="help-step"><span class="help-num">✏️</span><div><strong>Ingresar notas</strong><br>Haga clic en la celda de puntos de cualquier actividad (incluidas las de banco y asistencia automática) para abrir la ventana de calificación de esa actividad. Desde allí puede ingresar los puntos, ver la nota calculada y agregar comentarios.</div></div>
+        <div class="help-step"><span class="help-num">🎯</span><div><strong>Modo nota directa</strong><br>Si ya tiene las notas calculadas en papel y quiere ingresarlas directamente sin calcular puntos, pulse el botón <strong>📝 Modo: Pts</strong> en la ventana de notas. Cambia a <strong>🎯 Modo: Nota</strong> y puede escribir la nota (1.0 a 5.0) directamente. El sistema calcula los puntos equivalentes solo.</div></div>
+        <div class="help-step"><span class="help-num">👤</span><div><strong>Vista por estudiante</strong><br>En la <strong>Planilla Definitiva</strong>, haga clic en el nombre subrayado de cualquier estudiante para abrir su vista personal. Allí verá todas sus notas de todos los pilares en una sola pantalla, podrá editarlas, agregar puntos en bancos y escribir comentarios. Use los botones ◀ Anterior y Siguiente ▶ para navegar entre estudiantes sin cerrar.</div></div>
+        <div class="help-step"><span class="help-num">📈</span><div><strong>Bancos de puntos</strong><br>Los bancos (Participación, Preguntas orales, Desempeño en clase, Revisión de tareas) acumulan puntos por sesión. Cada botón +1, +2, +3 agrega puntos a ese estudiante. La nota se calcula automáticamente del total acumulado.</div></div>
+        <div class="help-step"><span class="help-num">🎯</span><div><strong>Prueba por Competencias (PxC)</strong><br>El pilar PxC tiene su propio sistema. Primero configure las preguntas con sus opciones A/B/C/D y puntajes. Luego, al calificar, seleccione la respuesta de cada estudiante en el desplegable de cada columna. La nota se calcula y colorea en tiempo real. Use el índice de letras a la derecha para saltar rápido a un estudiante.</div></div>
+        <div class="help-step"><span class="help-num">📋</span><div><strong>Copiar PxC a otros cursos</strong><br>Desde la configuración de la prueba, el botón <em>📋 Copiar a cursos…</em> le permite aplicar las mismas preguntas a otros cursos del mismo grado sin tener que crearlas de nuevo.</div></div>
+        <div class="help-step"><span class="help-num">📄</span><div><strong>Planilla Definitiva</strong><br>La pestaña Resumen muestra la nota definitiva de cada estudiante con el cálculo ponderado de los cuatro pilares. Desde aquí también puede abrir la vista personal de cada estudiante tocando su nombre.</div></div>
+        <div class="help-step"><span class="help-num">🔄</span><div><strong>Modo semestral (parciales)</strong><br>Para cursos con evaluación semestral, active <em>Evaluación con parciales</em> en Configuración → Cursos. Esto reemplaza PxC por Parcial 1 y Parcial 3, con pesos del 30% cada uno.</div></div>
+        <div class="help-step"><span class="help-num">💬</span><div><strong>Comentarios en notas</strong><br>Al abrir la ventana de calificación de cualquier actividad, puede escribir comentarios individuales por estudiante. Quedan guardados con fecha y se ven en la vista personal del estudiante.</div></div>
       </div>
     `
   },
   {
     icon:'📝',title:'Seguimiento',
     content:`
-      <h3>Observaciones, llamados de atención e informe de desempeño</h3>
-      <p>Registre observaciones individuales y llamados de atención por estudiante, y genere un informe completo de su desempeño académico.</p>
+      <h3>Ficha de seguimiento de cada estudiante</h3>
       <div class="help-card">
-        <div class="help-step"><span class="help-num">📝</span><div><strong>Ícono en las planillas</strong><br>En la planilla de asistencia, notas y resumen, cada estudiante tiene un ícono 📝 a la izquierda de su nombre. Un punto rojo indica que tiene llamados pendientes.</div></div>
-        <div class="help-step"><span class="help-num">💬</span><div><strong>Observaciones generales</strong><br>Al hacer clic en 📝 se abre la ficha del estudiante. Puede escribir observaciones libres sobre su situación académica, familiar o acuerdos.</div></div>
-        <div class="help-step"><span class="help-num">⚠️</span><div><strong>Llamados de atención</strong><br>Agregue llamados con fecha, descripción y estado: <em>Informado</em>, <em>En seguimiento</em> o <em>Resuelto</em>.</div></div>
-        <div class="help-step"><span class="help-num">🗂</span><div><strong>Vista Seguimiento</strong><br>En el menú lateral, la sección <em>📝 Seguimiento</em> muestra todos los estudiantes del curso con sus observaciones y estado de llamados, con filtros por estado.</div></div>
-        <div class="help-step"><span class="help-num">📊</span><div><strong>Informe de Desempeño del Estudiante</strong><br>La pestaña <em>📊 Informe</em> de la ficha genera un informe completo por asignatura y período. Incluye: asistencia con barra visual de P/T/J/A, notas por pilar con el detalle de cada actividad, indicador de tendencia (↑ Mejora / ↓ Baja / → Estable) y comparativa anónima con el promedio del grupo. También muestra las notas de inasistencias justificadas y los llamados de atención.</div></div>
-        <div class="help-step"><span class="help-num">↑↓</span><div><strong>Tendencia de notas</strong><br>El indicador de tendencia compara el desempeño en la primera mitad de actividades del período con la segunda mitad. <em>↑ Mejora</em> indica que el estudiante ha ido subiendo sus notas; <em>↓ Baja</em> que ha bajado; <em>→ Estable</em> que se mantiene. Requiere al menos 3 actividades calificadas.</div></div>
-        <div class="help-step"><span class="help-num">📈</span><div><strong>Comparativa con el grupo</strong><br>Al pie de cada pilar en el informe, una barra muestra la posición del estudiante respecto al promedio anónimo del curso. La línea vertical indica al estudiante; la barra de fondo el promedio del grupo. La diferencia se muestra en puntos (ej: ↑ 0.5 sobre promedio).</div></div>
-        <div class="help-step"><span class="help-num">🖨️</span><div><strong>Imprimir o exportar el informe</strong><br>Use <em>🖨️ Imprimir</em> para abrir el informe en una ventana limpia lista para imprimir o guardar como PDF. Use <em>⬇ Excel</em> para descargar el informe completo en hoja de cálculo con todas las secciones.</div></div>
-        <div class="help-step"><span class="help-num">💾</span><div><strong>Respaldo</strong><br>Toda la información de seguimiento se incluye en el respaldo JSON y en la sincronización con la nube.</div></div>
+        <div class="help-step"><span class="help-num">📝</span><div><strong>Abrir la ficha</strong><br>En cualquier planilla (asistencia, notas), cada estudiante tiene un ícono 📝 a la izquierda de su nombre. Un punto rojo indica que ya tiene llamados pendientes. Haga clic para abrir su ficha.</div></div>
+        <div class="help-step"><span class="help-num">📋</span><div><strong>Observaciones generales</strong><br>En la ficha puede escribir observaciones libres sobre la situación académica, familiar o acuerdos con el estudiante. Quedan guardadas con fecha.</div></div>
+        <div class="help-step"><span class="help-num">⚠️</span><div><strong>Llamados de atención</strong><br>Registre llamados con fecha, descripción y estado (Pendiente, En proceso, Resuelto). Los pendientes aparecen destacados para que no se le pasen por alto.</div></div>
+        <div class="help-step"><span class="help-num">📊</span><div><strong>Informe de desempeño</strong><br>La pestaña <em>Informe</em> dentro de la ficha muestra un resumen completo del estudiante: notas por pilar, tendencia de mejora o bajada, comparación con el promedio del grupo y un comentario automático según su desempeño.</div></div>
+        <div class="help-step"><span class="help-num">🗂</span><div><strong>Vista de seguimiento</strong><br>En el menú lateral, la sección 📝 Seguimiento muestra todos los estudiantes de un curso con indicadores de riesgo académico y de inasistencia en una sola pantalla.</div></div>
       </div>
     `
   },
   {
     icon:'☁️',title:'Sincronización',
     content:`
-      <h3>Respaldo en Google Drive</h3>
-      <p>Sus datos se guardan automáticamente en su <strong>Google Drive</strong> personal. La sincronización funciona entre PC y Tablet usando la misma cuenta de Google.</p>
+      <h3>Sus datos en la nube</h3>
+      <p>La app guarda todo en su <strong>Google Drive</strong> personal. Sus datos son suyos, no de la app.</p>
       <div class="help-card">
-        <div class="help-step"><span class="help-num">1</span><div><strong>Conectar Google Drive</strong><br>Al ingresar por primera vez, la app le pedirá que inicie sesión con su cuenta de Google. Haga clic en <em>Conectar con Google</em> y autorice el acceso. Sus datos quedarán guardados en una carpeta llamada <strong>Bitacora Docente</strong> en su Drive.</div></div>
-        <div class="help-step"><span class="help-num">2</span><div><strong>Sincronización automática</strong><br>Cada vez que guarde cambios, la app los envía automáticamente al Drive en 2.5 segundos. El indicador ☁️ en la barra superior muestra el estado: <em>sincronizando</em>, <em>al día</em> o <em>error</em>.</div></div>
-        <div class="help-step"><span class="help-num">3</span><div><strong>Usar en otro dispositivo</strong><br>Abra la app en otro dispositivo (PC, tablet, etc.) e inicie sesión con <strong>la misma cuenta de Google</strong>. Sus datos se cargarán automáticamente desde el Drive al detectar el archivo de respaldo.</div></div>
-        <div class="help-step"><span class="help-num">⬇</span><div><strong>Traer datos manualmente</strong><br>Si necesita forzar la carga desde el Drive (ej: otro dispositivo actualizó los datos), vaya a <em>⚙️ Configuración → ☁️ Sincronización</em> y pulse <em>⬇ Traer datos</em>. Si hay conflicto entre datos locales y del Drive, la app le preguntará cuáles conservar.</div></div>
-        <div class="help-step"><span class="help-num">📁</span><div><strong>Archivo en Drive</strong><br>Sus datos se guardan como <em>bitacora_docente_backup.json</em> dentro de la carpeta <em>Bitacora Docente</em> en su Google Drive. No elimine ni mueva esta carpeta.</div></div>
-        <div class="help-step"><span class="help-num">🔒</span><div><strong>Seguridad</strong><br>La app solo accede a su propia carpeta de datos. No puede leer ni modificar otros archivos de su Drive. Sus datos académicos son privados y solo usted tiene acceso.</div></div>
+        <div class="help-step"><span class="help-num">1</span><div><strong>Conectar Google Drive</strong><br>Al ingresar por primera vez, haga clic en <em>Conectar con Google</em> y autorice el acceso. La app creará una carpeta llamada <strong>Bitacora Docente</strong> en su Drive donde guardará todo automáticamente.</div></div>
+        <div class="help-step"><span class="help-num">2</span><div><strong>Guardado automático</strong><br>Cada vez que hace un cambio, la app lo guarda en su dispositivo de inmediato. Luego, en unos segundos, lo envía también a Drive. Puede trabajar sin internet — se sincroniza cuando recupere la conexión.</div></div>
+        <div class="help-step"><span class="help-num">3</span><div><strong>Usar en otro dispositivo</strong><br>Abra la app en su computador o en otra tablet e inicie sesión con <strong>la misma cuenta de Google</strong>. Sus datos se cargarán automáticamente. No necesita hacer nada más.</div></div>
+        <div class="help-step"><span class="help-num">⬇️</span><div><strong>Traer datos manualmente</strong><br>Si otro dispositivo actualizó los datos y quiere cargar esos cambios, vaya a <em>⚙️ Configuración → ☁️ Sincronización</em> y pulse <em>⬇ Traer datos</em>. Si hay datos diferentes en los dos lados, la app le preguntará cuáles conservar.</div></div>
+        <div class="help-step"><span class="help-num">🔒</span><div><strong>Sus datos son privados</strong><br>La app solo puede acceder a su propia carpeta <em>Bitacora Docente</em>. No tiene acceso a ningún otro archivo de su Drive. Nadie más puede ver su información.</div></div>
       </div>
     `
   },
   {
     icon:'📉',title:'Reportes de Desempeño',
     content:`
-      <h3>Corte preventivo de notas</h3>
-      <p>Permite generar un reporte de estudiantes en situación de bajo desempeño, ideal para alertas tempranas y comunicación a padres de familia.</p>
+      <h3>Informes para la toma de decisiones</h3>
       <div class="help-card">
-        <div class="help-step"><span class="help-num">1</span><div><strong>Seleccione curso y período</strong><br>Escoja el curso, el período a evaluar, la nota mínima de alerta (ej. 3.5) y el porcentaje mínimo de asistencia (ej. 75%).</div></div>
-        <div class="help-step"><span class="help-num">2</span><div><strong>Genere el reporte</strong><br>Al hacer clic en <em>🔍 Generar reporte</em>, la app analiza automáticamente notas por pilar (SABER, HACER, SER, PxC), asistencia y llamados de atención activos.</div></div>
-        <div class="help-step"><span class="help-num">3</span><div><strong>Dos categorías de alerta</strong><br>
-          🔴 <strong>Bajo desempeño</strong>: nota acumulada por debajo del umbral Y tiene actividades pendientes o con nota baja.<br>
-          🟡 <strong>En riesgo</strong>: nota igual o superior al umbral, pero tiene actividades pendientes, notas individuales bajas, asistencia insuficiente o llamados activos.<br>
-          Las razones muestran el nombre exacto de cada actividad problemática.</div></div>
-        <div class="help-step"><span class="help-num">4</span><div><strong>Imprimir o exportar</strong><br>Use <em>🖨️ Imprimir</em> para generar un PDF imprimible, o <em>📊 Exportar Excel</em> para compartir el reporte en hoja de cálculo.</div></div>
-        <div class="help-step"><span class="help-num">📋</span><div><strong>Plan de mejoramiento desde el corte</strong><br>En la tabla de estudiantes con bajo desempeño, cada fila tiene el botón <em>📋 P.M.</em>. Al pulsarlo se abre la ficha del estudiante en Seguimiento y se registra automáticamente un llamado tipo <em>Plan de mejoramiento</em> con fecha y texto predeterminado editable.</div></div>
-        <div class="help-step"><span class="help-num">📋</span><div><strong>Informe Final de Período</strong><br>La pestaña <em>Informe Final de Período</em> genera una planilla completa con todas las actividades de cada pilar, el promedio por componente, su peso ponderado y la nota definitiva. Para cursos sin PxC active la opción <em>"Sin PxC"</em> y el promedio de SABER+HACER+SER se usará automáticamente. Para cursos semestrales muestra Parcial 1 (30%), SABER+HACER+SER (40%) y Parcial 3 (30%).</div></div>
-        <div class="help-step"><span class="help-num">📈</span><div><strong>Progreso Anual</strong><br>La pestaña <em>📈 Progreso Anual</em> muestra la evolución de la nota definitiva período a período, calculada automáticamente desde los pilares (SABER/HACER/SER/PxC). Presenta la nota de cada período, la nota acumulada ponderada y la nota mínima requerida en los períodos restantes para aprobar con 3.0. Incluye tarjetas visuales por estudiante con barras de progreso. Solo aplica a asignaturas por períodos (no semestrales).</div></div>
-        <div class="help-step"><span class="help-num">%</span><div><strong>Ponderación anual de períodos</strong><br>En <em>⚙️ Configuración → Períodos</em> cada período tiene un campo <em>% anual</em> que indica su peso en la nota definitiva del año (ej: P1=30%, P2=30%, P3=40%). La suma debe ser exactamente 100% — la app muestra un indicador verde o rojo. Estas ponderaciones son usadas automáticamente por el reporte de Progreso Anual.</div></div>
+        <div class="help-step"><span class="help-num">⚠️</span><div><strong>Reporte de alerta temprana</strong><br>En la pestaña <em>Alertas</em>, elija el curso, el período, la nota mínima de alerta (ej: 3.5) y el porcentaje mínimo de asistencia (ej: 75%). La app genera una lista de estudiantes en riesgo académico o de inasistencia.</div></div>
+        <div class="help-step"><span class="help-num">📋</span><div><strong>Plan de mejoramiento</strong><br>En la tabla de alertas, cada estudiante con nota perdida tiene el botón <em>📋 PM</em>. Al usarlo puede registrar la nota del plan de mejoramiento y esta reemplaza la nota perdida en el cálculo definitivo.</div></div>
+        <div class="help-step"><span class="help-num">📄</span><div><strong>Informe Final de Período</strong><br>Genera un reporte por curso con las notas definitivas de todos los estudiantes, listo para imprimir o compartir con coordinación.</div></div>
+        <div class="help-step"><span class="help-num">📈</span><div><strong>Progreso Anual</strong><br>Muestra cómo ha evolucionado la nota definitiva de cada estudiante período a período. También calcula qué nota necesita en los períodos que faltan para aprobar con 3.0. Solo aplica a cursos por períodos (no semestrales).</div></div>
+        <div class="help-step"><span class="help-num">🖨️</span><div><strong>Imprimir o guardar</strong><br>Todos los reportes tienen botón de impresión. También puede exportar las planillas de notas y asistencia a hoja de cálculo desde el panel de Exportar.</div></div>
       </div>
     `
   },
   {
     icon:'💾',title:'Exportar y Respaldar',
     content:`
-      <h3>Exportación y respaldo de datos</h3>
-      <p>Exporte sus datos a Excel o realice respaldos completos para no perder información.</p>
+      <h3>Copias de seguridad de sus datos</h3>
       <div class="help-card">
-        <div class="help-step"><span class="help-num">📊</span><div><strong>Exportar asistencia o notas a Excel</strong><br>Haga clic en <em>⬇ Exportar</em>, seleccione el tipo (Asistencia o Notas), elija los cursos y el período. Puede generar una hoja por curso o todo en una sola hoja.</div></div>
-        <div class="help-step"><span class="help-num">📋</span><div><strong>Exportar bitácora</strong><br>En el mismo panel, seleccione <em>Bitácora</em> y elija el formato Excel o CSV. Cada curso quedará en una hoja separada.</div></div>
-        <div class="help-step"><span class="help-num">💾</span><div><strong>Respaldo completo (JSON)</strong><br>Use el botón <em>💾 Respaldo JSON</em> para descargar <strong>todos sus datos</strong>: perfil, cursos, estudiantes, asistencia, calificaciones, bitácora, horarios y configuración de sincronización. Guarde este archivo en un lugar seguro.</div></div>
-        <div class="help-step"><span class="help-num">📂</span><div><strong>Restaurar desde respaldo</strong><br>Use <em>📂 Restaurar</em> y seleccione un archivo de respaldo JSON previamente descargado. <strong>Atención:</strong> esto reemplazará todos los datos actuales.</div></div>
-      </div>
-        <div class="help-step"><span class="help-num">🔄</span><div><strong>Inicializar año académico</strong><br>Al terminar el año, vaya a <em>⚙️ Configuración → 🔄 Año Académico</em>. El proceso tiene tres pasos: (1) <strong>Crear respaldo</strong> del año actual — se guarda en Drive como <em>bitacora_respaldo_2024-2025.json</em> y puede descargarse localmente; (2) <strong>Elegir qué hacer con los estudiantes</strong> — promoverlos al siguiente nivel (se conservan en los cursos) o borrar los listados para cargar nuevos; (3) <strong>Ejecutar</strong> — limpia todas las notas, asistencia, actividades y seguimiento, conservando perfil, cursos, horarios y asignación.</div></div>
-        <div class="help-step"><span class="help-num">📂</span><div><strong>Consultar años anteriores</strong><br>En la misma sección <em>🔄 Año Académico</em>, el panel <em>Respaldos anteriores</em> lista todos los archivos de respaldo guardados en Drive. Desde la versión web puede abrirlos en modo de solo lectura para consultar datos de años pasados.</div></div>
-      </div>
-      <div style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);border-radius:var(--rs);padding:10px 14px;font-size:12px;color:#B91C1C;margin-top:12px">
-        ⚠️ <strong>Recomendación:</strong> cree siempre el respaldo de año académico <strong>antes</strong> de ejecutar la inicialización. Esta acción no se puede deshacer.
+        <div class="help-step"><span class="help-num">📊</span><div><strong>Descargar planillas</strong><br>En <em>⚙️ Configuración → 💾 Exportar</em> puede descargar sus planillas de calificaciones y asistencia en formato de hoja de cálculo (Excel), listas para imprimir o compartir.</div></div>
+        <div class="help-step"><span class="help-num">📋</span><div><strong>Descargar bitácora</strong><br>En el mismo panel puede descargar todos sus registros de bitácora en un archivo de hoja de cálculo, filtrado por curso o por período.</div></div>
+        <div class="help-step"><span class="help-num">📦</span><div><strong>Copia de seguridad completa</strong><br>El botón <em>Descargar respaldo</em> guarda todos sus datos (notas, asistencia, bitácora, configuración) en un archivo que puede guardar en su computador. Si algo le pasa al dispositivo, puede restaurar todo desde ese archivo.</div></div>
+        <div class="help-step"><span class="help-num">↩️</span><div><strong>Restaurar desde una copia</strong><br>Si necesita recuperar sus datos desde un respaldo guardado, use el botón <em>Restaurar</em> y seleccione el archivo. Tenga en cuenta que esto reemplaza todos los datos actuales.</div></div>
+        <div class="help-step"><span class="help-num">🔄</span><div><strong>Iniciar un nuevo año escolar</strong><br>Al terminar el año, vaya a <em>⚙️ Configuración → 🔄 Año Académico</em>. El proceso tiene tres pasos: (1) crear una copia del año actual que queda guardada en Drive con el nombre del año (ej: 2025-2026); (2) decidir qué hacer con los estudiantes — promoverlos o borrar los listados; (3) ejecutar la inicialización. Todo queda limpio para el nuevo año sin perder el historial.</div></div>
+        <div class="help-step"><span class="help-num">📂</span><div><strong>Consultar años anteriores</strong><br>En la misma sección de Año Académico, la lista de respaldos anteriores le permite ver lo que registró en años pasados, directamente desde la app.</div></div>
       </div>
     `
   },
   {
     icon:'⚡',title:'Funciones Avanzadas',
     content:`
-      <h3>Herramientas adicionales de productividad</h3>
-      <p>Estas funciones están disponibles en distintos módulos y complementan el flujo habitual de trabajo.</p>
+      <h3>Herramientas adicionales que facilitan el trabajo</h3>
       <div class="help-card">
-        <div class="help-step"><span class="help-num">🧮</span><div><strong>Calculadora de notas</strong><br>En <em>📊 Calificaciones</em>, seleccione la pestaña <em>🧮 Calculadora</em>. Ingrese los puntos obtenidos y posibles para conocer la nota y el nivel de desempeño al instante (fórmula: Obt ÷ Pos × 4 + 1).</div></div>
-        <div class="help-step"><span class="help-num">💧</span><div><strong>Nombre de actividad como marca de agua</strong><br>En la planilla de calificaciones, al hacer clic sobre el nombre de un estudiante o sobre cualquier celda de puntuación, todas las celdas de esa fila muestran el nombre de la actividad correspondiente como marca de agua de fondo. La celda que está siendo editada muestra la marca con mayor intensidad y un borde azul, para que siempre sepa con precisión en qué actividad está trabajando aunque los encabezados queden fuera de la vista.</div></div>
-        <div class="help-step"><span class="help-num">📊</span><div><strong>Asistencia → SER</strong><br>En la pestaña <em>SER</em> de Calificaciones, el botón <em>📊 Asistencia→SER</em> crea automáticamente una actividad evaluable con la nota de asistencia de cada estudiante (escala 1.0–5.0). Si la actividad ya existe, puede actualizarla o crear una adicional. Las notas se recalculan cada vez que modifica la asistencia.</div></div>
-        <div class="help-step"><span class="help-num">📣</span><div><strong>Banco de Participación → SER</strong><br>En la pestaña <em>SER</em>, el botón <em>📣 Participación→SER</em> abre un banco acumulativo de puntos de participación en clase. Registre <strong>+0</strong> para marcar presencia sin participación, <strong>+1, +2 o +3</strong> por cada participación, y <strong>−1</strong> si necesita penalizar. El botón <strong>+0</strong> queda registrado con fecha y descripción pero no altera la nota. Opcionalmente agregue una descripción del momento. Una vez generada la nota en planilla, el botón cambia de <em>✓ Convertir a nota</em> a <em>💾 Guardar</em> para actualizaciones posteriores. La fórmula es <strong>3 + (puntos/máximo) × 2</strong>. Los bancos no permiten cerrarse con Escape ni tocando el fondo — solo con el botón <em>✕</em> o <em>Cerrar</em>.</div></div>
-        <div class="help-step"><span class="help-num">🗣️</span><div><strong>Banco de Preguntas Orales → SABER</strong><br>En la pestaña <em>SABER</em>, el botón <em>🗣️ Preguntas orales→SABER</em> funciona igual que el banco de participación pero ancla la nota al componente SABER. Ideal para valorar respuestas orales, argumentación y construcción del conocimiento en tiempo real durante la clase.</div></div>
-        <div class="help-step"><span class="help-num">⚒️</span><div><strong>Banco de Desempeño en Clase → HACER</strong><br>En la pestaña <em>HACER</em>, el botón <em>⚒️ Desempeño en clase→HACER</em> permite puntuar el proceso y la actitud de cada estudiante durante las actividades de clase. Diferencia a quienes trabajan con esmero de quienes no lo hacen, con evidencia fechada y descriptiva del proceso.</div></div>
-        <div class="help-step"><span class="help-num">📚</span><div><strong>Banco de Revisión de Tareas</strong><br>Disponible en las pestañas <em>SER</em>, <em>SABER</em> y <em>HACER</em> mediante el botón <em>📚 Tareas→[PILAR]</em>. El docente elige el componente según su criterio pedagógico. Registre cuatro tipos de situación: <strong>+1 ✅</strong> tarea entregada · <strong>+½ 🕐</strong> entregada tarde o incompleta · <strong>+2 ⭐</strong> tarea excepcional · <strong>−1 ❌</strong> no entregada. El máximo de puntos es configurable (default 10). La nota se calcula con la fórmula <strong>3 + (puntos/máximo) × 2</strong>, con rango completo de 1.0 a 5.0. El historial (con nombre de la tarea como comentario) es visible en la ficha de seguimiento de cada estudiante.</div></div>
-        <div class="help-step"><span class="help-num">💬</span><div><strong>Comentarios en fechas de clase</strong><br>En la planilla de asistencia, cada encabezado de columna tiene un ícono 💬. Úselo para registrar el motivo de una fecha especial (paro, festivo, evaluación externa, etc.). Las fechas con comentario quedan marcadas en azul.</div></div>
-        <div class="help-step"><span class="help-num">📝</span><div><strong>Notas en celdas Justificadas (J)</strong><br>Al marcar un estudiante como <em>J (Justificado)</em>, aparece el ícono 📝 junto a la celda. Tóquelo para registrar el motivo de la justificación (ej: certificado médico). La nota queda guardada y visible al pasar el cursor.</div></div>
-        <div class="help-step"><span class="help-num">🔔</span><div><strong>Alerta de inasistencia ≥ 30%</strong><br>Si un estudiante supera el 30% de inasistencia no justificada, su fila se resalta en naranja con el distintivo <em>⚠ +30%</em>. Haga clic en el ícono 🔔 para ver el desglose y tomar acción: agregar una observación en Seguimiento o crear un registro automático en la Bitácora.</div></div>
-        <div class="help-step"><span class="help-num">🔀</span><div><strong>Modo evaluación por parciales</strong><br>Para grados con evaluación semestral, active <em>"Evaluación con parciales"</em> al crear o editar el curso en ⚙️ Config → Cursos. El PxC (10%) se reemplaza por <strong>Parcial 1 (30%)</strong> y <strong>Parcial 3 (30%)</strong>; SABER + HACER + SER quedan en el 40% restante. Las pestañas de Calificaciones y el Informe Final se adaptan automáticamente.</div></div>
-        <div class="help-step"><span class="help-num">↩</span><div><strong>Deshacer múltiple</strong><br>El botón ↩ deshace la última acción. Haga clic en la flecha ▾ junto al botón para desplegar el historial completo y escoger hasta qué punto deshacer. Lo mismo aplica para ↪ Rehacer. El historial guarda hasta 30 acciones.</div></div>
-        <div class="help-step"><span class="help-num">💬</span><div><strong>Comentarios múltiples en actividades</strong><br>En la ventana de ingreso de notas (botón <em>📝 Notas</em> en el encabezado de cada actividad), cada estudiante tiene un campo para agregar comentarios con fecha. Puede agregar <strong>varios comentarios por estudiante</strong> en la misma actividad: toque <em>＋</em> o presione Enter. Cada comentario es editable (toque el texto) y eliminable (✕). El contador 💬 N en la celda muestra cuántos comentarios tiene.</div></div>
-        <div class="help-step"><span class="help-num">📋</span><div><strong>Plan de Mejoramiento (Recuperación)</strong><br>Cuando un estudiante tiene una nota perdida (&lt;3.0) en la planilla, aparece el botón <em>📋 PM</em> en su celda. Al tocarlo puede registrar la nota de recuperación. La nota original queda visible tachada como referencia, y la nueva nota entra al cálculo del promedio. El sistema crea automáticamente un registro en el seguimiento del estudiante con fecha y resultado. Puede eliminar la recuperación con <em>✕ PM</em>.</div></div>
-        <div class="help-step"><span class="help-num">⛶</span><div><strong>Pantalla completa</strong><br>El botón <em>⛶</em> en la barra superior activa el modo pantalla completa, ocultando la barra del navegador para maximizar el espacio de trabajo en tablet. El ícono cambia a <em>⊠</em> para salir. También puede salir con la tecla Escape.</div></div>
-        <div class="help-step"><span class="help-num">📊</span><div><strong>Informe de Desempeño desde la Ficha</strong><br>En la ficha de cualquier estudiante (ícono 📝 junto a su nombre), la pestaña <em>📊 Informe</em> genera un reporte completo por asignatura y período: asistencia con barra visual P/T/J/A, notas por pilar con indicador de tendencia (↑↓→), comparativa anónima con el promedio del grupo, notas de justificaciones, observaciones y llamados de atención. Se puede <em>🖨️ Imprimir</em> o <em>⬇ Exportar a Excel</em>.</div></div>
-        <div class="help-step"><span class="help-num">🗣️</span><div><strong>Voces del Desempeño</strong><br>Debajo de cada actividad en el informe del estudiante aparece automáticamente una frase contextual según su nota: <em>«Ha demostrado ser altamente competente para…»</em> (DS), <em>«Con frecuencia…»</em> (DA), <em>«En ocasiones…»</em> (DB), <em>«Presenta dificultades para…»</em> (DBj), o <em>«Pendiente por evaluar su capacidad para…»</em> si no está calificado. La frase se construye con el indicador de evaluación de la actividad. Si la actividad no tiene indicador, aparece «Sin indicador definido».</div></div>
-        <div class="help-step"><span class="help-num">⚙️</span><div><strong>Configurar Voces del Desempeño</strong><br>En <em>⚙️ Configuración → 🗣️ Voces</em> puede personalizar los umbrales de calificación (por defecto: DS ≥ 4.6, DA ≥ 4.0, DB ≥ 3.0, estándar colombiano) y editar las cinco plantillas de frases. Use <code>{indicador}</code> en cada plantilla para insertar el indicador de la actividad. Incluye vista previa en tiempo real y botón para restaurar los valores predeterminados.</div></div>
-        <div class="help-step"><span class="help-num">📌</span><div><strong>Banner de identificación</strong><br>Al pie de las planillas de <em>Asistencia</em>, <em>Calificaciones</em> y los resultados de <em>Reportes</em> aparece un banner con los datos del docente, institución, curso, asignatura y período. En Calificaciones muestra además el número de actividades y estudiantes; en Reportes indica el tipo de reporte generado. Facilita la identificación del documento al imprimir.</div></div>
-        <div class="help-step"><span class="help-num">📅</span><div><strong>Fecha visible en celdas de inasistencia</strong><br>Las celdas con estado <strong>A</strong> (Ausente), <strong>T</strong> (Tardanza) y <strong>J</strong> (Justificada) muestran la fecha de la clase directamente debajo del botón, en el color correspondiente. Así puede identificar la fecha de cualquier inasistencia sin tener que desplazarse hasta el encabezado de la columna. Al cambiar el estado la etiqueta desaparece o cambia automáticamente.</div></div>
-        <div class="help-step"><span class="help-num">🔃</span><div><strong>Invertir fechas de asistencia</strong><br>El botón <em>🔃 Invertir fechas</em> en la barra de asistencia invierte el orden de las columnas para que la fecha más reciente aparezca justo al lado del nombre del estudiante. Ideal cuando hay muchas fechas registradas. El estado se recuerda automáticamente entre sesiones.</div></div>
-        <div class="help-step"><span class="help-num">🔒</span><div><strong>Bloquear registros de asistencia</strong><br>El botón <em>🔒 Bloquear registros</em> activa un modo en el que solo la columna de la fecha seleccionada en el selector de asistencia masiva es editable. Las demás columnas se ven con normalidad pero no responden al toque, evitando errores de digitación involuntaria. Al cambiar la fecha en el selector, la columna editable cambia automáticamente. El estado se recuerda entre sesiones.</div></div>
-        <div class="help-step"><span class="help-num">🔤</span><div><strong>Ordenar estudiantes alfabéticamente</strong><br>En <em>⚙️ Configuración → Estudiantes</em> el botón <em>🔤 Ordenar A→Z</em> reordena la lista completa del curso seleccionado en orden alfabético (con soporte de tildes y ñ). A partir de ese momento, cada nuevo estudiante que se agregue entrará automáticamente en su posición correcta. La operación se puede deshacer con el botón ↩.</div></div>
-        <div class="help-step"><span class="help-num">🔄</span><div><strong>Curso activo compartido entre módulos</strong><br>Al cambiar entre Asistencia, Calificaciones, Seguimiento y Reportes, la aplicación recuerda el curso en el que estaba trabajando y lo selecciona automáticamente en el nuevo módulo. Así no tiene que seleccionar el curso cada vez que cambia de herramienta. Esta información también se preserva al regresar a la app tras suspender la tablet o cambiar de aplicación.</div></div>
+        <div class="help-step"><span class="help-num">↩️</span><div><strong>Deshacer y Rehacer</strong><br>Los botones <strong>↩ Deshacer ▾</strong> y <strong>↪ Rehacer ▾</strong> en la barra superior revierten cambios recientes. Haga clic en la flecha ▾ para ver el historial completo y escoger hasta qué punto deshacer. Funciona en notas, asistencia y configuración.</div></div>
+        <div class="help-step"><span class="help-num">👤</span><div><strong>Vista personal del estudiante</strong><br>En la <strong>Planilla Definitiva</strong>, toque el nombre subrayado de cualquier estudiante para abrir su vista completa: notas de todos los pilares, puntos en bancos con botones +/-, comentarios y nota definitiva. Use ◀ ▶ para ir al siguiente sin cerrar. Ideal para calificar sentado con trabajos físicos en mano.</div></div>
+        <div class="help-step"><span class="help-num">🏷</span><div><strong>Nombres de actividad visibles</strong><br>Al hacer clic en cualquier fila de la planilla de calificaciones, las celdas de esa fila muestran el nombre de cada actividad como texto de fondo. Útil para orientarse cuando hay muchas columnas.</div></div>
+        <div class="help-step"><span class="help-num">📊</span><div><strong>Barra de progreso en bancos</strong><br>En la ventana de banco de puntos, cada estudiante tiene una barra de color debajo de los botones +/−. El color cambia según la nota acumulada: verde (buena), amarillo (regular), rojo (baja).</div></div>
+        <div class="help-step"><span class="help-num">🔢</span><div><strong>Calculadora de notas</strong><br>En <em>⚙️ Configuración</em> hay una calculadora donde puede ingresar puntos obtenidos y posibles para ver qué nota da, o al revés: ingresar una nota para saber cuántos puntos necesita.</div></div>
+        <div class="help-step"><span class="help-num">📅</span><div><strong>Período activo automático</strong><br>Si configuró fechas de inicio y fin en sus períodos, la app detecta automáticamente cuál está vigente cada vez que la abre. Aplica tanto a períodos trimestrales como a semestres.</div></div>
+        <div class="help-step"><span class="help-num">🔁</span><div><strong>Curso recordado entre módulos</strong><br>Al pasar de Asistencia a Calificaciones, o a Seguimiento, la app recuerda en qué curso estaba trabajando y lo selecciona automáticamente. No tiene que buscarlo de nuevo.</div></div>
+        <div class="help-step"><span class="help-num">📱</span><div><strong>Pantalla completa</strong><br>El botón ⛶ en la barra superior activa el modo pantalla completa. Útil en tablet para ganar espacio al trabajar con planillas grandes.</div></div>
+        <div class="help-step"><span class="help-num">🗣</span><div><strong>Voces del desempeño</strong><br>En el informe de cada estudiante aparecen frases automáticas según su nota en cada pilar. Puede personalizar estas frases en <em>⚙️ Configuración → 🗣 Voces del desempeño</em>.</div></div>
       </div>
     `
-  }
+  },
 ];
 
+
 const TOUR_STEPS=[
-  {icon:'👋',title:'¡Bienvenido a Bitácora Docente!',body:'Su asistente de gestión docente. En los siguientes pasos le mostramos cómo sacarle el máximo provecho.'},
-  {icon:'⚙️',title:'Configure primero',body:'Vaya a Configuración: agregue perfil (con foto), cursos, defina la plantilla de períodos (aplicable a todos los cursos), agregue estudiantes y configure sus horarios.'},
-  {icon:'🕐',title:'Mi Día y Mi Asignación',body:'Seleccione el horario del día y vea su agenda en tiempo real. Los fines de semana muestra un mensaje de descanso, salvo que configure un horario de Sábado o Domingo.'},
-  {icon:'📋',title:'Registre sus clases',body:'La Bitácora es su diario docente. Cree un registro por cada clase: tema, actividades, estado y observaciones.'},
-  {icon:'✅',title:'Controle la asistencia',body:'Agregue fechas de clase y marque la asistencia de cada estudiante. La app calcula estadísticas automáticamente.'},
-  {icon:'📊',title:'Gestione las calificaciones',body:'Organice sus notas en cuatro pilares: SABER, HACER, SER y Prueba por Competencias. La nota definitiva se calcula sola.'},
-  {icon:'📝',title:'Seguimiento de estudiantes',body:'Haga clic en el ícono 📝 junto a cualquier estudiante para registrar observaciones y llamados de atención con seguimiento de estado.'},
-    {icon:'☁️',title:'Sincronización automática',body:'Sus datos se guardan automáticamente en Google Drive. Al abrir la app en otro dispositivo con la misma cuenta de Google, sus datos se cargan solos. Para respaldar el año académico use Configuración → Año Académico.'},
+  {icon:'👋',title:'¡Bienvenido a Bitácora Docente!',body:'Su herramienta de gestión pedagógica. Todo lo que necesita para llevar el registro de sus clases, asistencia y notas en un solo lugar, sincronizado con su Google Drive.'},
+  {icon:'⚙️',title:'Primero: configure su información',body:'Vaya a Configuración (ícono de engranaje) y cree sus cursos, períodos y agregue sus estudiantes. Solo lo hace una vez al inicio del año.'},
+  {icon:'📆',title:'Mi Día: su punto de partida',body:'Cada vez que abra la app, Mi Día le muestra su clase actual. Desde ahí accede con un toque a la bitácora, asistencia o notas de ese curso.'},
+  {icon:'📋',title:'Registre sus clases en la bitácora',body:'Use el botón + Nuevo registro para anotar qué hizo en clase, eventos, imprevistos o cualquier novedad. Es su diario pedagógico digital.'},
+  {icon:'✅',title:'Controle la asistencia',body:'Toque la celda de cada estudiante para marcar su estado. El ciclo es: — → P → A → T → J → —. Para limpiar rápido, clic derecho en computador o mantener presionado en tablet.'},
+  {icon:'📊',title:'Gestione las calificaciones',body:'Organice sus notas en cuatro pilares: SABER, HACER, SER y Prueba por Competencias. Toque cualquier celda de nota para abrir la ventana de calificación. La nota definitiva se calcula sola.'},
+  {icon:'👤',title:'Vista personal del estudiante',body:'En la Planilla Definitiva, toque el nombre subrayado de un estudiante para ver y editar todas sus notas de una vez, con botones de navegación para ir al siguiente sin cerrar.'},
+  {icon:'☁️',title:'Sincronización automática',body:'Sus datos se guardan automáticamente en Google Drive. Ábralos desde cualquier dispositivo con la misma cuenta de Google y todo estará ahí.'},
 ];
+
 
 let tourStep=0;
 let curHelpTab=0;
@@ -10231,6 +10190,10 @@ function removeRecovery(cId,asig,per,stuId,actId){
 // ══════════════════════════════════════════
 let _ae={actId:'',cId:'',asig:'',per:'',focusStuId:null};
 let _aeModoNota=false;
+let _sv={stuId:'',cId:'',asig:'',per:'',studs:[]};
+let _svBuf={};
+let _svDirty=false;
+let _svModoNota=false;
 // Temporary score buffer while modal is open
 let _aeBuf={};
 
@@ -11791,6 +11754,443 @@ function _dbFast(fn){
 }
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+// ════════════════════════════════════════════════════════
+// VISTA POR ESTUDIANTE
+// ════════════════════════════════════════════════════════
+
+function openStuView(stuId,cId,asig,per){
+  const studs=getStuDs(cId,per);
+  _sv={stuId,cId,asig,per,studs};
+  _svBuf={};_svDirty=false;_svModoNota=false;
+  _svInitBuf();
+  const chk=document.getElementById('sv-modo-nota');
+  if(chk)chk.checked=false;
+  document.getElementById('stu-view-ov').classList.add('open');
+  renderStuView();
+}
+
+function _svInitBuf(){
+  const data=getGrD(_sv.cId,_sv.asig,_sv.per);
+  const stScores=(data.scores||{})[_sv.stuId]||{};
+  _svBuf={};
+  // Iterar sobre TODAS las actividades para cargar comentarios aunque no tengan score
+  (data.activities||[]).forEach(function(act){
+    const sc=stScores[act.id]||{};
+    let cmts=[];
+    if(sc.comments&&sc.comments.length){
+      cmts=JSON.parse(JSON.stringify(sc.comments));
+    } else if(sc.comment){
+      cmts=[{fecha:sc.commentDate||'',texto:sc.comment}];
+    }
+    _svBuf[act.id]={
+      obt:sc.obt!==undefined?String(sc.obt):'',
+      pos:sc.pos!==undefined?String(sc.pos):'',
+      posFixed:!!sc.posFixed,
+      comments:cmts
+    };
+  });
+}
+
+function renderStuView(){
+  const{stuId,cId,asig,per,studs}=_sv;
+  const st=studs.find(s=>s.id===stuId);
+  if(!st)return;
+  const idx=studs.findIndex(s=>s.id===stuId);
+  const data=getGrD(cId,asig,per);
+  const c=getC(cId);
+  document.getElementById('sv-stu-name').textContent=st.nombre;
+  document.getElementById('sv-stu-sub').textContent=
+    (c?c.nombre+' \u00b7 ':'')+(asig||'')+' \u00b7 '+(per?'Per. '+per:'');
+  const prevBtn=document.getElementById('sv-prev-btn');
+  const nextBtn=document.getElementById('sv-next-btn');
+  if(prevBtn)prevBtn.disabled=(idx===0);
+  if(nextBtn)nextBtn.disabled=(idx===studs.length-1);
+
+  const PILLARS=[
+    {key:'saber',label:'SABER',pct:30,color:'#3B82F6'},
+    {key:'hacer',label:'HACER',pct:30,color:'#22C55E'},
+    {key:'ser',  label:'SER',  pct:10,color:'#A855F7'},
+  ];
+  let html='';
+  let notaFinal=0,notaFinalW=0;
+
+  PILLARS.forEach(function(pil){
+    const acts=(data.activities||[]).filter(function(a){
+      return a.pilar===pil.key||(pil.key==='saber'&&!a.pilar);
+    });
+    let pilProm=null;
+    if(acts.length){
+      const notas=acts.map(function(a){
+        // Auto y banco: usar getActNota igual que la planilla definitiva
+        if(a.auto||a.partBank||a.tareasBank||a.actType==='banco'){
+          return getActNota(data,a,stuId);
+        }
+        const buf=_svBuf[a.id];
+        const obt=buf&&buf.obt!==''?Number(buf.obt):undefined;
+        const pos=a.posibles||0;
+        return(obt!==undefined&&pos)?calcNota(obt,pos):null;
+      }).filter(n=>n!==null);
+      if(notas.length)pilProm=notas.reduce((a,b)=>a+b,0)/notas.length;
+    }
+    if(pilProm!==null){notaFinal+=pilProm*pil.pct;notaFinalW+=pil.pct;}
+    html+='<div style="margin-bottom:14px">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;'+
+      'border-bottom:2px solid '+pil.color+';padding-bottom:4px;margin-bottom:8px">'+
+      '<span style="font-weight:700;font-size:13px;color:'+pil.color+'">'+pil.label+' ('+pil.pct+'%)</span>'+
+      '<span style="font-size:13px;font-weight:700;color:'+pil.color+'">'+
+      (pilProm!==null?'Prom: <strong class="pn '+notaCls(pilProm)+'">'+pilProm.toFixed(1)+'</strong>':'Sin calificar')+
+      '</span></div>'+
+      (acts.length?acts.map(function(a){return _svRenderAct(a,stuId,data);}).join('')
+        :'<div style="font-size:12px;color:var(--ink3);padding:4px 8px">Sin actividades</div>')+
+      '</div>';
+  });
+
+  // PxC — solo lectura
+  const pxcSc=((data.scores||{})[stuId]||{})['_pxc']||{};
+  const pxcN=(pxcSc.obt!==undefined&&pxcSc.pos)?calcNota(pxcSc.obt,pxcSc.pos):null;
+  if(pxcN!==null){notaFinal+=pxcN*10;notaFinalW+=10;}
+  html+='<div style="margin-bottom:14px">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;'+
+    'border-bottom:2px solid #F97316;padding-bottom:4px;margin-bottom:8px">'+
+    '<span style="font-weight:700;font-size:13px;color:#F97316">PxC (10%)</span>'+
+    '<span style="font-size:13px;font-weight:700">'+
+    (pxcN!==null?'<strong class="pn '+notaCls(pxcN)+'">'+pxcN.toFixed(1)+'</strong>'+
+    ' <span style="font-size:10px;color:var(--ink3)">(solo lectura)</span>':
+    '<span style="color:var(--ink3)">Sin calificar</span>')+
+    '</span></div></div>';
+
+  const bodyEl=document.getElementById('sv-body');
+  if(bodyEl)bodyEl.innerHTML=html;
+
+  // Nota final: usar acumNota igual que la planilla definitiva
+  const co2=getC(_sv.cId);
+  const nf=acumNota(data,stuId,co2?.evalMode||'normal');
+  const nfEl=document.getElementById('sv-nota-final');
+  if(nfEl){nfEl.textContent=nf!==null?nf.toFixed(1):'—';nfEl.className='pn '+(nf!==null?notaCls(nf):'em');}
+}
+
+function _svRenderAct(act, stuId, data){
+  if(!_svBuf[act.id])_svBuf[act.id]={obt:'',pos:'',posFixed:false,comments:[]};
+  const buf = _svBuf[act.id];
+
+  const isAttAuto  = !!(act.auto && !act.partBank && !act.tareasBank);
+  const isBankAuto = !!(act.partBank || act.tareasBank);
+  const isBancoCustom = act.actType === 'banco';
+  const pilar = act.pilar || 'saber';
+
+  // Nota guardada (siempre desde datos reales)
+  const nota = getActNota(data, act, stuId);
+  const hasNota = nota !== null;
+  const dotColor = hasNota
+    ? (nota>=4.5?'#22C55E':nota>=4?'#5C8A2E':nota>=3.5?'#7D6B12':nota>=3?'#7D4912':'#EF4444')
+    : 'var(--br)';
+  const cmts = buf.comments || [];
+  const editId = 'sv-edit-' + act.id;
+
+  // ── Cabecera (siempre visible) ──
+  const header =
+    '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--sf);cursor:pointer"' +
+    ' onclick="svToggleEdit(\'' + act.id + '\')">' +
+    '<span style="width:10px;height:10px;border-radius:50%;background:' + dotColor +
+    ';flex-shrink:0;border:1px solid rgba(0,0,0,.1)"></span>' +
+    '<span style="flex:1;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+    esc(act.name || 'Sin nombre') + '</span>' +
+    (isAttAuto  ? '<span style="font-size:10px;color:var(--ink3)">🔒 auto</span>' : '') +
+    '<span class="pn ' + (hasNota ? notaCls(nota) : 'em') + '" style="font-size:13px;font-weight:700;min-width:32px;text-align:right">' +
+    (hasNota ? nota.toFixed(1) : '—') + '</span>' +
+    (cmts.length ? '<span style="font-size:10px;background:var(--ac);color:#fff;border-radius:10px;padding:1px 5px">' +
+    cmts.length + '💬</span>' : '') +
+    '<span style="font-size:10px;color:var(--ink3);margin-left:2px">' + (isAttAuto ? '' : '✎') + '</span>' +
+    '</div>';
+
+  // ── Contenido del panel colapsable ──
+  let panelContent = '';
+
+  if(isAttAuto){
+    panelContent =
+      '<div style="padding:8px 12px;font-size:11px;color:var(--ink3);font-style:italic">' +
+      'Nota calculada automáticamente desde asistencia. Solo lectura.</div>';
+
+  } else if(isBankAuto){
+    // Banco de participación o tareas — controles +/- inline
+    const bKey = act.partBank ? 'participacion_' + pilar : 'tareas_' + pilar;
+    const bMaxKey = act.partBank ? 'partMax_' + pilar : 'tareasMax_' + pilar;
+    const bEntries = (data[bKey] || {})[stuId] || [];
+    const bMax = data[bMaxKey] || 10;
+    const bTotal = act.partBank
+      ? partTotal(bEntries)
+      : tareasTotal(bEntries);
+    const pct = bMax > 0 ? Math.min(100, Math.round(bTotal / bMax * 100)) : 0;
+    const barColor = nota !== null
+      ? (nota>=4.5?'#22C55E':nota>=4?'#5C8A2E':nota>=3.5?'#7D6B12':nota>=3?'#7D4912':'#8B2D27')
+      : 'var(--br)';
+
+    panelContent =
+      '<div style="padding:8px 12px;display:flex;flex-direction:column;gap:6px">' +
+      '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
+      '<span style="font-size:11px;color:var(--ink3)">Pts: <strong>' + bTotal + ' / ' + bMax + '</strong></span>' +
+      '<button class="btn xs" style="opacity:.65" onclick="svBankAdj(\'' + act.id + '\',\'' + pilar + '\',' + (act.partBank?1:0) + ',0)">+0</button>' +
+      '<button class="btn xs" onclick="svBankAdj(\'' + act.id + '\',\'' + pilar + '\',' + (act.partBank?1:0) + ',1)">+1</button>' +
+      '<button class="btn xs" onclick="svBankAdj(\'' + act.id + '\',\'' + pilar + '\',' + (act.partBank?1:0) + ',2)">+2</button>' +
+      '<button class="btn xs" onclick="svBankAdj(\'' + act.id + '\',\'' + pilar + '\',' + (act.partBank?1:0) + ',3)">+3</button>' +
+      '<button class="btn xs danger" onclick="svBankAdj(\'' + act.id + '\',\'' + pilar + '\',' + (act.partBank?1:0) + ',-1)" style="opacity:.7">−1</button>' +
+      '</div>' +
+      '<div style="height:5px;background:var(--br);border-radius:3px;overflow:hidden">' +
+      '<div id="sv-bar-' + act.id + '" style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:3px;transition:width .25s,background .25s"></div>' +
+      '</div></div>';
+
+  } else if(isBancoCustom){
+    // Banco personalizado — mismos controles que renderAeList
+    const sc = ((data.scores || {})[stuId] || {})[act.id] || {};
+    const pts = buf.obt !== '' ? Number(buf.obt) : (sc.obt !== undefined ? sc.obt : 0);
+    const maxPts = act.maxPtsBanco || 10;
+    const pct = maxPts > 0 ? Math.min(100, Math.round(pts / maxPts * 100)) : 0;
+    const notaB = calcNotaBanco(pts, maxPts);
+    const barColor = notaB !== null
+      ? (notaB>=4.5?'#22C55E':notaB>=4?'#5C8A2E':notaB>=3.5?'#7D6B12':notaB>=3?'#7D4912':'#8B2D27')
+      : 'var(--br)';
+
+    panelContent =
+      '<div style="padding:8px 12px;display:flex;flex-direction:column;gap:6px">' +
+      '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
+      '<span class="ae-banco-pts" style="font-size:11px;color:var(--ink3)">Pts: <strong id="sv-bpts-' + act.id + '">' + (pts > 0 ? '+' : '') + pts + '</strong> / máx ' + maxPts + '</span>' +
+      '<button class="btn xs" style="opacity:.65" onclick="svBancoAdj(\'' + act.id + '\',0)">+0</button>' +
+      '<button class="btn xs" onclick="svBancoAdj(\'' + act.id + '\',1)">+1</button>' +
+      '<button class="btn xs" onclick="svBancoAdj(\'' + act.id + '\',2)">+2</button>' +
+      '<button class="btn xs" onclick="svBancoAdj(\'' + act.id + '\',3)">+3</button>' +
+      '<button class="btn xs danger" onclick="svBancoAdj(\'' + act.id + '\',-1)" style="opacity:.7">−1</button>' +
+      '</div>' +
+      '<div style="height:5px;background:var(--br);border-radius:3px;overflow:hidden">' +
+      '<div id="sv-bar-' + act.id + '" style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:3px;transition:width .25s,background .25s"></div>' +
+      '</div></div>';
+
+  } else {
+    // Actividad normal — input editable
+    const obt = buf.obt !== '' ? Number(buf.obt) : undefined;
+    const pos = act.posibles || 0;
+    const notaE = (obt !== undefined && pos) ? calcNota(obt, pos) : null;
+    const inputVal = _svModoNota && obt !== undefined && pos
+      ? (Math.round(((obt / pos) * 4 + 1) * 10) / 10).toFixed(1)
+      : (buf.obt || '');
+
+    panelContent =
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px">' +
+      '<label style="font-size:11px;color:var(--ink3);font-weight:600">' + (_svModoNota ? 'Nota (1-5):' : 'Pts obtenidos:') + '</label>' +
+      '<input type="number" id="sv-obt-' + act.id + '" min="' + (_svModoNota ? 1 : 0) + '" ' +
+      (_svModoNota ? 'max="5" ' : '') +
+      'step="' + (_svModoNota ? 0.1 : 0.5) + '" value="' + inputVal + '" placeholder="' + (_svModoNota ? '1.0' : '0') + '"' +
+      ' style="width:70px;font-size:14px;font-weight:700;text-align:center;border:1px solid var(--br);border-radius:var(--rs);padding:4px 6px"' +
+      ' oninput="svUpdateAct(\'' + act.id + '\',this.value)">' +
+      (!_svModoNota ? '<span style="font-size:11px;color:var(--ink3)">/ ' + pos + ' pts</span>' : '') +
+      '<span id="sv-nota-' + act.id + '" class="pn ' + (notaE !== null ? notaCls(notaE) : 'em') + '" style="font-size:13px;font-weight:700;margin-left:4px">' +
+      (notaE !== null ? notaE.toFixed(1) : '—') + '</span></div>';
+  }
+
+  // Sección de comentarios — siempre dentro del panel colapsable
+  const cmtsSection =
+    '<div style="padding:0 12px 8px;display:flex;flex-direction:column;gap:4px">' +
+    (cmts.length
+      ? cmts.map(function(cm, i){
+          return '<div style="display:flex;align-items:flex-start;gap:6px;background:rgba(99,102,241,.07);' +
+            'border-left:3px solid var(--ac);border-radius:0 var(--rs) var(--rs) 0;padding:4px 8px;font-size:11px">' +
+            (cm.fecha ? '<span style="color:var(--ink3);flex-shrink:0;font-size:10px">' + esc(cm.fecha) + '</span>' : '') +
+            '<span style="flex:1">' + esc(cm.texto || '') + '</span>' +
+            '<button onclick="svDelCmt(\'' + act.id + '\',' + i + ')" ' +
+            'style="border:none;background:none;color:var(--err);cursor:pointer;font-size:11px;padding:0;flex-shrink:0">✕</button>' +
+            '</div>';
+        }).join('') : '') +
+    '<div style="display:flex;gap:6px;margin-top:4px">' +
+    '<input type="text" id="sv-cmt-' + act.id + '" placeholder="Añade un comentario…"' +
+    ' style="flex:1;font-size:12px;border:1px solid var(--br);border-radius:var(--rs);padding:4px 8px"' +
+    ' onkeydown="if(event.key===\'Enter\'){event.preventDefault();svAddCmt(\'' + act.id + '\');}">' +
+    '<button class="btn xs primary" onclick="svAddCmt(\'' + act.id + '\')">＋ Comentario</button>' +
+    '</div></div>';
+
+  return '<div style="border:1px solid var(--br);border-radius:var(--rs);margin-bottom:6px;overflow:hidden">' +
+    header +
+    '<div id="' + editId + '" style="display:none;border-top:1px solid var(--br);background:var(--bg);flex-direction:column">' +
+    panelContent + cmtsSection +
+    '</div></div>';
+}
+
+
+// Ajustar banco de participación o tareas desde la vista de estudiante
+function svBankAdj(actId, pilar, isPartBank, delta){
+  const data=getGrD(_sv.cId,_sv.asig,_sv.per);
+  const bKey=(isPartBank?'participacion_':'tareas_')+pilar;
+  const bMaxKey=(isPartBank?'partMax_':'tareasMax_')+pilar;
+  if(!data[bKey])data[bKey]={};
+  if(!data[bKey][_sv.stuId])data[bKey][_sv.stuId]=[];
+  if(delta!==0){
+    data[bKey][_sv.stuId].push({fecha:today(),pts:delta,desc:'Vista estudiante'});
+  }
+  const bMax=data[bMaxKey]||10;
+  const entries=data[bKey][_sv.stuId];
+  const total=isPartBank?partTotal(entries):tareasTotal(entries);
+  const pct=bMax>0?Math.min(100,Math.round(total/bMax*100)):0;
+  const nota2=isPartBank?partNota(total,bMax,pilar):tareasNota(total,bMax);
+  const barColor=nota2!==null?(nota2>=4.5?'#22C55E':nota2>=4?'#5C8A2E':nota2>=3.5?'#7D6B12':nota2>=3?'#7D4912':'#8B2D27'):'var(--br)';
+  const barEl=document.getElementById('sv-bar-'+actId);
+  if(barEl){barEl.style.width=pct+'%';barEl.style.background=barColor;}
+  const ptsEl=document.querySelector('#sv-edit-'+actId+' .ae-banco-pts strong, #sv-edit-'+actId+' strong');
+  // Refrescar cabecera
+  _svDirty=true;
+  save();
+  renderStuView();
+}
+
+// Ajustar banco personalizado desde la vista de estudiante
+function svBancoAdj(actId, delta){
+  const data=getGrD(_sv.cId,_sv.asig,_sv.per);
+  const act=(data.activities||[]).find(function(a){return a.id===actId;});
+  if(!act)return;
+  const maxPts=act.maxPtsBanco||10;
+  if(!_svBuf[actId])_svBuf[actId]={obt:'0',pos:'',posFixed:false,comments:[]};
+  const cur=_svBuf[actId].obt!==''?Number(_svBuf[actId].obt):0;
+  const newPts=cur+delta;
+  _svBuf[actId].obt=String(newPts);
+  _svDirty=true;
+  const pct=maxPts>0?Math.min(100,Math.round(newPts/maxPts*100)):0;
+  const notaB=calcNotaBanco(newPts,maxPts);
+  const barColor=notaB!==null?(notaB>=4.5?'#22C55E':notaB>=4?'#5C8A2E':notaB>=3.5?'#7D6B12':notaB>=3?'#7D4912':'#8B2D27'):'var(--br)';
+  const barEl=document.getElementById('sv-bar-'+actId);
+  if(barEl){barEl.style.width=pct+'%';barEl.style.background=barColor;}
+  const ptsEl=document.getElementById('sv-bpts-'+actId);
+  if(ptsEl)ptsEl.textContent=(newPts>0?'+':'')+newPts;
+}
+
+
+function svToggleEdit(actId){
+  const el=document.getElementById('sv-edit-'+actId);
+  if(!el)return;
+  const isOpen=el.style.display==='flex';
+  document.querySelectorAll('[id^="sv-edit-"]').forEach(function(e){e.style.display='none';});
+  if(!isOpen){el.style.display='flex';setTimeout(function(){document.getElementById('sv-obt-'+actId)?.focus();},50);}
+}
+
+function svUpdateAct(actId,val){
+  if(!_svBuf[actId])_svBuf[actId]={obt:'',pos:'',posFixed:false,comments:[]};
+  const data=getGrD(_sv.cId,_sv.asig,_sv.per);
+  const act=(data.activities||[]).find(function(a){return a.id===actId;});
+  const pos=act?act.posibles:0;
+  let obt;
+  if(_svModoNota&&val!==''&&pos){
+    obt=Math.max(0,Math.round(((parseFloat(val)-1)*pos/4)*100)/100);
+    _svBuf[actId].obt=String(obt);
+  } else {
+    obt=val===''?undefined:parseFloat(val);
+    _svBuf[actId].obt=val===''?'':String(obt);
+  }
+  const nota=(obt!==undefined&&pos)?calcNota(obt,pos):null;
+  const nEl=document.getElementById('sv-nota-'+actId);
+  if(nEl){nEl.textContent=nota?nota.toFixed(1):'—';nEl.className='pn '+(nota?notaCls(nota):'em');}
+  _svDirty=true;
+  _svUpdateFinal();
+}
+
+function svAddCmt(actId){
+  const inp=document.getElementById('sv-cmt-'+actId);
+  const txt=(inp?.value||'').trim();
+  if(!txt)return;
+  if(!_svBuf[actId])_svBuf[actId]={obt:'',pos:'',posFixed:false,comments:[]};
+  _svBuf[actId].comments.push({fecha:today(),texto:txt});
+  if(inp)inp.value='';
+  _svDirty=true;
+  svToggleEdit(actId);svToggleEdit(actId);
+}
+
+function svDelCmt(actId,idx){
+  if(!_svBuf[actId])return;
+  _svBuf[actId].comments.splice(idx,1);
+  _svDirty=true;
+  svToggleEdit(actId);svToggleEdit(actId);
+}
+
+function svToggleModo(){
+  _svModoNota=document.getElementById('sv-modo-nota').checked;
+  renderStuView();
+}
+
+function _svUpdateFinal(){
+  const data=getGrD(_sv.cId,_sv.asig,_sv.per);
+  const co=getC(_sv.cId);
+  const evalMode=co?.evalMode||'normal';
+  // Usar acumNota — idéntica a la planilla definitiva, sin recalcular
+  const nota=acumNota(data,_sv.stuId,evalMode);
+  const el=document.getElementById('sv-nota-final');
+  if(el){
+    el.textContent=nota!==null?nota.toFixed(1):'—';
+    el.className='pn '+(nota!==null?notaCls(nota):'em');
+  }
+}
+
+function svSave(){
+  if(!_svDirty){closeStuView();return;}
+  pushUndo('Editar notas — '+(_sv.studs.find(function(s){return s.id===_sv.stuId;})||{nombre:''}).nombre);
+  const data=getGrD(_sv.cId,_sv.asig,_sv.per);
+  if(!data.scores)data.scores={};
+  if(!data.scores[_sv.stuId])data.scores[_sv.stuId]={};
+  Object.keys(_svBuf).forEach(function(actId){
+    const buf=_svBuf[actId];
+    const act=(data.activities||[]).find(function(a){return a.id===actId;});
+    if(!act)return;
+    const hasCmts=(buf.comments&&buf.comments.length>0);
+    const hasObt=(buf.obt!==''&&buf.obt!==undefined);
+    if(!hasObt&&!hasCmts){
+      // Sin puntos ni comentarios — borrar el entry si existe
+      delete data.scores[_sv.stuId][actId];
+    } else if(!hasObt&&hasCmts){
+      // Solo comentarios — guardar sin tocar obt
+      const prev=data.scores[_sv.stuId][actId]||{};
+      data.scores[_sv.stuId][actId]={...prev,comments:buf.comments};
+    } else {
+      // Tiene puntos (y quizás comentarios)
+      const prev=data.scores[_sv.stuId][actId]||{};
+      data.scores[_sv.stuId][actId]={...prev,obt:Number(buf.obt),pos:act.posibles,comments:buf.comments||[]};
+    }
+  });
+  save();markGrDirty();renderGrades();
+  _svDirty=false;
+  toast('Notas guardadas','s');
+  closeStuView();
+}
+
+function svNav(dir){
+  if(_svDirty){
+    if(!confirm('Tienes cambios sin guardar.\n\n\u00bfPasar al siguiente estudiante sin guardar?'))return;
+  }
+  const idx=_sv.studs.findIndex(function(s){return s.id===_sv.stuId;});
+  const next=_sv.studs[idx+dir];
+  if(!next)return;
+  _sv.stuId=next.id;
+  _svBuf={};_svDirty=false;_svModoNota=false;
+  _svInitBuf();
+  const chk=document.getElementById('sv-modo-nota');
+  if(chk)chk.checked=false;
+  renderStuView();
+}
+
+function closeStuView(){
+  if(_svDirty){
+    if(!confirm('Tienes cambios sin guardar.\n\n\u00bfSalir sin guardar?'))return;
+  }
+  document.getElementById('stu-view-ov').classList.remove('open');
+  _svBuf={};_svDirty=false;
+}
+
+
 function init(skip){
   loadScheduleData();loadSeg();load();rebuildMdiaTipoSel();
   // En Android: limpiar sesión desbloqueada para que el PIN siempre se solicite
@@ -12242,5 +12642,37 @@ if('serviceWorker' in navigator){
     .catch(()=>{}); // silent fail — app works without SW
 }
 </script>
+<!-- VISTA POR ESTUDIANTE -->
+<div class="ov bank-ov" id="stu-view-ov">
+  <div class="bank-modal">
+    <div class="mhdr" style="justify-content:space-between;gap:8px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="btn sm" onclick="svNav(-1)" id="sv-prev-btn" title="Estudiante anterior">◀ Anterior</button>
+        <div>
+          <div class="mtitle" id="sv-stu-name" style="font-size:15px">Estudiante</div>
+          <div id="sv-stu-sub" style="font-size:12px;color:var(--ink3);margin-top:2px"></div>
+        </div>
+        <button class="btn sm" onclick="svNav(1)" id="sv-next-btn" title="Estudiante siguiente">Siguiente ▶</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--ink3);cursor:pointer">
+          <input type="checkbox" id="sv-modo-nota" onchange="svToggleModo()" style="accent-color:var(--ac)">
+          Modo nota directa
+        </label>
+        <button class="mx" onclick="closeStuView()">✕</button>
+      </div>
+    </div>
+    <div class="bank-body" style="padding:10px 14px;gap:8px;overflow-y:auto">
+      <div id="sv-body"></div>
+      <div style="border-top:2px solid var(--br);padding-top:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;flex-shrink:0">
+        <div style="font-size:14px;font-weight:700;color:var(--ink)">
+          Nota estimada: <span id="sv-nota-final" class="pn em" style="font-size:18px;margin-left:6px">—</span>
+        </div>
+        <button class="btn primary" onclick="svSave()">💾 Guardar cambios</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
