@@ -3589,7 +3589,13 @@ function renderGrades(){
         if(isBankAuto&&bankNota!==null){
           notas.push(bankNota);
         }
-        cells+='<td class="gtd-pts" style="cursor:pointer" onclick="openActEntry(\''+a.id+'\''+',\''+cId+'\''+',\''+esc(asig)+'\''+',\''+per+'\''+',\''+st.id+'\')" title="'+cellTitle+'">'+
+        // Acción al tocar celda: banco abre su overlay, asistencia muestra toast
+        const cellClick=isBankAuto
+          ?(a.partBank
+            ?'openPartBank(\''+((a.pilar)||'ser')+'\',\''+st.id+'\')'
+            :'openTareasBank(\''+((a.pilar)||'saber')+'\',\''+st.id+'\')' )
+          :'toast(\'Nota calculada automáticamente desde asistencia\',\'i\')';
+        cells+='<td class="gtd-pts" style="cursor:pointer" onclick="'+cellClick+'" title="'+cellTitle+'">'+
           '<span class="act-wm">'+esc(a.name)+'</span>'+
           '<div style="text-align:center;padding:2px 0">'+
           '<span class="pn '+(isBankAuto?(bankHasData?notaCls(bankNota):'lo'):(nota!==null?notaCls(nota):'em'))+'" style="font-size:13px">'+
@@ -9401,7 +9407,7 @@ const PART_NAMES={
 };
 let _partPilar='ser';
 
-function openPartBank(pilar){
+function openPartBank(pilar,focusStuId){
   pilar=pilar||'ser'; _partPilar=pilar;
   const{cId,asig,per}=getGrK();
   if(!cId||!asig){toast('Selecciona curso y asignatura','e');return;}
@@ -9426,7 +9432,25 @@ function openPartBank(pilar){
   if(gdate)gdate.value=today();
   renderPartList(cId,asig,per,pilar);
   document.getElementById('part-ov').classList.add('open');
+  if(focusStuId) _scrollToBankStu('part-list', focusStuId);
 }
+// Scroll al estudiante en el banco de participación o tareas
+function _scrollToBankStu(listId, stuId){
+  setTimeout(function(){
+    const list=document.getElementById(listId);
+    if(!list)return;
+    const row=list.querySelector('tr[data-stu="'+stuId+'"]')||
+              list.querySelector('[data-stu-id="'+stuId+'"]')||
+              list.querySelector('[data-stu="'+stuId+'"]');
+    if(!row)return;
+    row.scrollIntoView({behavior:'smooth',block:'center'});
+    const orig=row.style.background;
+    row.style.background='var(--acl)';
+    row.style.transition='background 0.6s';
+    setTimeout(function(){row.style.background=orig;row.style.transition='';},900);
+  },120);
+}
+
 function closePartBank(){ document.getElementById('part-ov').classList.remove('open'); }
 
 function savePartMax(){
@@ -9871,7 +9895,7 @@ const TAREAS_ACT_NAME='Revisión de Tareas';
 let _tareasPilar='hacer';
 let _tareasPending={stuId:null,pts:0,cId:'',asig:'',per:'',pilar:'',editIdx:-1};
 
-function openTareasBank(pilar){
+function openTareasBank(pilar,focusStuId){
   pilar=pilar||'hacer'; _tareasPilar=pilar;
   const{cId,asig,per}=getGrK();
   if(!cId||!asig){toast('Selecciona curso y asignatura','e');return;}
@@ -9893,6 +9917,7 @@ function openTareasBank(pilar){
   if(gdate)gdate.value=today();
   renderTareasList(cId,asig,per,pilar);
   document.getElementById('tareas-ov').classList.add('open');
+  if(focusStuId) _scrollToBankStu('tareas-list', focusStuId);
 }
 
 function closeTareasBank(){
@@ -12603,7 +12628,10 @@ function _svUpdateFinal(){
 }
 
 function svSave(){
-  if(!_svDirty){closeStuView();return;}
+  if(!_svDirty){
+    toast('Sin cambios pendientes','i');
+    return;
+  }
   pushUndo('Editar notas — '+(_sv.studs.find(function(s){return s.id===_sv.stuId;})||{nombre:''}).nombre);
   const data=getGrD(_sv.cId,_sv.asig,_sv.per);
   if(!data.scores)data.scores={};
@@ -12612,6 +12640,9 @@ function svSave(){
     const buf=_svBuf[actId];
     const act=(data.activities||[]).find(function(a){return a.id===actId;});
     if(!act)return;
+    // Nunca tocar actividades automáticas (asistencia, bancos auto)
+    // — su nota se calcula en tiempo real y no debe borrarse
+    if(act.auto||act.partBank||act.tareasBank)return;
     const hasCmts=(buf.comments&&buf.comments.length>0);
     const hasObt=(buf.obt!==''&&buf.obt!==undefined);
     if(act.actType==='entregas'){
@@ -12638,8 +12669,9 @@ function svSave(){
   });
   save();markGrDirty();renderGrades();
   _svDirty=false;
-  toast('Notas guardadas','s');
-  closeStuView();
+  toast('✅ Notas guardadas','s');
+  // NO cerrar la vista — el docente puede seguir editando o navegar al siguiente
+  renderStuView();
 }
 
 function svNav(dir){
