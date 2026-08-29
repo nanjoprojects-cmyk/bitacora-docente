@@ -3985,7 +3985,10 @@ function renderResumen(content,data,studs,cId,asig,per){
         '<td class="gtd-name" style="position:sticky;left:38px;z-index:1;white-space:nowrap">'+
           '<button class="seg-ico" onclick="openFicha(\''+st.id+'\',\''+esc(st.nombre)+'\',\''+cId+'\')" title="Observaciones y llamados">'+
           (getSeg(st.id).llamados.length?'<span class="seg-dot"></span>':'')+
-          '📝</button> '+esc(st.nombre)+
+          '📝</button> '+
+        '<span style="cursor:pointer;border-bottom:1px dotted var(--ac)"'+
+        ' onclick="openStuView(\''+st.id+'\',\''+cId+'\',\''+esc(asig)+'\',\''+per+'\')"'+
+        ' title="Ver notas">'+esc(st.nombre)+'</span>'+
         '</td>'+
         // P1
         '<td class="gtd-prom">'+n(vP1)+'</td>'+
@@ -10793,7 +10796,7 @@ function aeAddCmt(stuId){
   const fecha=document.getElementById('ae-global-date')?.value||today();
   if(!_aeBuf[stuId])return;
   if(!_aeBuf[stuId].comments)_aeBuf[stuId].comments=[];
-  _aeBuf[stuId].comments.push({id:uid(),text,fecha});
+  _aeBuf[stuId].comments.push({id:uid(),texto:text,fecha});
   inp.value='';
   renderAeList();
   // Don't auto-focus — on tablet this triggers keyboard
@@ -12163,7 +12166,10 @@ function _svInitBuf(){
     const sc=stScores[act.id]||{};
     let cmts=[];
     if(sc.comments&&sc.comments.length){
-      cmts=JSON.parse(JSON.stringify(sc.comments));
+      // Normalizar: aeAddCmt usa {text,fecha}, svAddCmt usa {texto,fecha}
+      cmts=sc.comments.map(function(c){
+        return {fecha:c.fecha||'',texto:c.texto||c.text||''};
+      });
     } else if(sc.comment){
       cmts=[{fecha:sc.commentDate||'',texto:sc.comment}];
     }
@@ -12186,74 +12192,47 @@ function renderStuView(){
   const c=getC(cId);
   const evalMode=c?.evalMode||'normal';
   const isParciales=evalMode==='parciales';
-
   document.getElementById('sv-stu-name').textContent=st.nombre;
   document.getElementById('sv-stu-sub').textContent=
-    (c?c.nombre+'\u00b7 ':'')+(asig||'')+'\u00b7 '+(per?'Per. '+per:'');
+    (c?c.nombre+'· ':'')+(asig||'')+'· '+(per?'Per. '+per:'');
   const prevBtn=document.getElementById('sv-prev-btn');
   const nextBtn=document.getElementById('sv-next-btn');
   if(prevBtn)prevBtn.disabled=(idx===0);
   if(nextBtn)nextBtn.disabled=(idx===studs.length-1);
-
-  let html='';
-
+  let bodyHtml='';
   if(isParciales){
-    // ── Modo semestral: P1 + (SABER/HACER/SER = P2) + P3 ──
     const SECTIONS=[
-      {key:'p1',   label:'Parcial 1',  pct:30, color:'#3B82F6'},
-      {key:'saber',label:'SABER',      pct:null,color:'#3B82F6', sub:true},
-      {key:'hacer',label:'HACER',      pct:null,color:'#22C55E', sub:true},
-      {key:'ser',  label:'SER',        pct:null,color:'#A855F7', sub:true},
-      {key:'p3',   label:'Parcial 3',  pct:30, color:'#F59E0B'},
+      {key:'p1',   label:'Parcial 1 (30%)', color:'#3B82F6',sub:false},
+      {key:'saber',label:'SABER',           color:'#3B82F6',sub:true, p2:true},
+      {key:'hacer',label:'HACER',           color:'#22C55E',sub:true, p2:true},
+      {key:'ser',  label:'SER',             color:'#A855F7',sub:true, p2:true},
+      {key:'p3',   label:'Parcial 3 (30%)', color:'#F59E0B',sub:false},
     ];
+    const hasP2Acts=(data.activities||[]).some(function(a){
+      return ['saber','hacer','ser'].includes(a.pilar)||(a.pilar===undefined||a.pilar===null||a.pilar==='');
+    });
+    let p2HeaderAdded=false;
     SECTIONS.forEach(function(sec){
       const acts=(data.activities||[]).filter(function(a){
         return a.pilar===sec.key||(sec.key==='saber'&&!a.pilar);
       });
       if(!acts.length)return;
-      // Promedio del pilar (solo actividades no-banco-auto)
-      const pilNotas=acts.map(function(a){
-        if(a.auto||a.partBank||a.tareasBank||a.actType==='banco'||a.actType==='entregas'){
-          return getActNota(data,a,stuId);
-        }
-        const buf=_svBuf[a.id];
-        const obt=buf&&buf.obt!==''?Number(buf.obt):undefined;
-        return(obt!==undefined&&a.posibles)?calcNota(obt,a.posibles):null;
-      }).filter(n=>n!==null);
-      const pilProm=pilNotas.length?Math.round(pilNotas.reduce((a,b)=>a+b,0)/pilNotas.length*10)/10:null;
+      if(sec.p2&&!p2HeaderAdded&&hasP2Acts){
+        p2HeaderAdded=true;
+        bodyHtml+='<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #6366F1;padding-bottom:4px;margin:14px 0 8px;font-weight:700;font-size:13px;color:#6366F1"><span>Módulo Integrador (40%)</span></div>';
+      }
+      const pilNotas=acts.map(function(a){return getActNota(data,a,stuId);}).filter(function(n){return n!==null;});
+      const pilProm=pilNotas.length?Math.round(pilNotas.reduce(function(s,n){return s+n;},0)/pilNotas.length*10)/10:null;
       const indent=sec.sub?'margin-left:12px;border-left:3px solid '+sec.color+';padding-left:8px':'';
-      html+='<div style="margin-bottom:14px;'+indent+'">';
-      html+='<div style="display:flex;align-items:center;justify-content:space-between;'+
-        'border-bottom:2px solid '+sec.color+';padding-bottom:4px;margin-bottom:8px">'+
-        '<span style="font-weight:700;font-size:'+(sec.sub?'12':'13')+'px;color:'+sec.color+'">';
-      if(!sec.sub&&sec.pct)html+=sec.label+' ('+sec.pct+'%)';
-      else if(sec.sub)html+='· '+sec.label;
-      else html+=sec.label;
-      html+='</span>'+
-        (pilProm!==null?'<strong class="pn '+notaCls(pilProm)+'">'+pilProm.toFixed(1)+'</strong>':
-        '<span style="color:var(--ink3)">Sin calificar</span>')+
+      bodyHtml+='<div style="margin-bottom:14px;'+indent+'">';
+      bodyHtml+='<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid '+sec.color+';padding-bottom:4px;margin-bottom:8px">';
+      bodyHtml+='<span style="font-weight:700;font-size:'+(sec.sub?'12':'13')+'px;color:'+sec.color+'">'+(sec.sub?'· ':'')+sec.label+'</span>';
+      bodyHtml+=(pilProm!==null?'<strong class="pn '+notaCls(pilProm)+'">'+pilProm.toFixed(1)+'</strong>':'<span style="color:var(--ink3)">Sin calificar</span>')+
         '</div>';
-      acts.forEach(function(a){html+=_svRenderAct(a,stuId,data);});
-      html+='</div>';
+      acts.forEach(function(a){bodyHtml+=_svRenderAct(a,stuId,data);});
+      bodyHtml+='</div>';
     });
-    // Cabecera P2
-    const p2Acts=(data.activities||[]).filter(function(a){
-      return ['saber','hacer','ser'].includes(a.pilar)||(a.pilar===undefined||a.pilar===null||a.pilar==='');
-    });
-    if(p2Acts.length){
-      // Insertar header P2 antes del primer sub-pilar
-      const p2Header='<div style="font-weight:700;font-size:13px;color:#6366F1;'+
-        'border-bottom:2px solid #6366F1;padding-bottom:4px;margin-bottom:8px;'+
-        'display:flex;align-items:center;justify-content:space-between">'+
-        '<span>Módulo Integrador (40%)</span></div>';
-      // Insertar antes del primer SABER
-      html=html.replace('<div style="margin-bottom:14px;margin-left:12px;border-left:3px solid #3B82F6',
-        '<div style="margin-bottom:4px">'+p2Header+'</div>'+
-        '<div style="margin-bottom:14px;margin-left:12px;border-left:3px solid #3B82F6');
-    }
-
   } else {
-    // ── Modo normal: SABER + HACER + SER + PxC ──
     const PILLARS=[
       {key:'saber',label:'SABER',pct:30,color:'#3B82F6'},
       {key:'hacer',label:'HACER',pct:30,color:'#22C55E'},
@@ -12264,48 +12243,18 @@ function renderStuView(){
         return a.pilar===pil.key||(pil.key==='saber'&&!a.pilar);
       });
       if(!acts.length)return;
-      const pilNotas=acts.map(function(a){
-        if(a.auto||a.partBank||a.tareasBank||a.actType==='banco'||a.actType==='entregas'){
-          return getActNota(data,a,stuId);
-        }
-        const buf=_svBuf[a.id];
-        const obt=buf&&buf.obt!==''?Number(buf.obt):undefined;
-        return(obt!==undefined&&a.posibles)?calcNota(obt,a.posibles):null;
-      }).filter(n=>n!==null);
-      const pilProm=pilNotas.length?Math.round(pilNotas.reduce((a,b)=>a+b,0)/pilNotas.length*10)/10:null;
-      html+='<div style="margin-bottom:14px">'+
-        '<div style="display:flex;align-items:center;justify-content:space-between;'+
-        'border-bottom:2px solid '+pil.color+';padding-bottom:4px;margin-bottom:8px">'+
-        '<span style="font-weight:700;font-size:13px;color:'+pil.color+'">'+pil.label+' ('+pil.pct+'%)</span>'+
-        (pilProm!==null?'<strong class="pn '+notaCls(pilProm)+'">'+pilProm.toFixed(1)+'</strong>':
-        '<span style="color:var(--ink3)">Sin calificar</span>')+
-        '</div>';
-      acts.forEach(function(a){html+=_svRenderAct(a,stuId,data);});
-      html+='</div>';
+      const pilNotas=acts.map(function(a){return getActNota(data,a,stuId);}).filter(function(n){return n!==null;});
+      const pilProm=pilNotas.length?Math.round(pilNotas.reduce(function(s,n){return s+n;},0)/pilNotas.length*10)/10:null;
+      bodyHtml+='<div style="margin-bottom:14px"><div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid '+pil.color+';padding-bottom:4px;margin-bottom:8px"><span style="font-weight:700;font-size:13px;color:'+pil.color+'">'+pil.label+' ('+pil.pct+'%)</span>'+(pilProm!==null?'<strong class="pn '+notaCls(pilProm)+'">'+pilProm.toFixed(1)+'</strong>':'<span style="color:var(--ink3)">Sin calificar</span>')+'</div>';
+      acts.forEach(function(a){bodyHtml+=_svRenderAct(a,stuId,data);});
+      bodyHtml+='</div>';
     });
-
-    // PxC — solo lectura
-    const pxcData=((data.scores||{})[stuId]||{});
     const pxcActs=(data.activities||[]).filter(function(a){return a.pilar==='pxc';});
-    const pxcNExt=pxcActs.length?getActNota(data,pxcActs[0],stuId):null;
-    // Calcular desde scores si existe
-    const pxcSc=pxcData['_pxc']||{};
-    const pxcN=pxcNExt!==null?pxcNExt:(pxcSc.obt!==undefined&&pxcSc.pos?calcNota(pxcSc.obt,pxcSc.pos):null);
-    html+='<div style="margin-bottom:14px">'+
-      '<div style="display:flex;align-items:center;justify-content:space-between;'+
-      'border-bottom:2px solid #F97316;padding-bottom:4px;margin-bottom:8px">'+
-      '<span style="font-weight:700;font-size:13px;color:#F97316">PxC (10%)</span>'+
-      '<span style="font-size:13px;font-weight:700">'+
-      (pxcN!==null?'<strong class="pn '+notaCls(pxcN)+'">'+pxcN.toFixed(1)+'</strong>'+
-      ' <span style="font-size:10px;color:var(--ink3)">(solo lectura)</span>':
-      '<span style="color:var(--ink3)">Sin calificar</span>')+
-      '</span></div></div>';
+    const pxcN=pxcActs.length?getActNota(data,pxcActs[0],stuId):null;
+    bodyHtml+='<div style="margin-bottom:14px"><div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #F97316;padding-bottom:4px;margin-bottom:8px"><span style="font-weight:700;font-size:13px;color:#F97316">PxC (10%)</span>'+(pxcN!==null?'<strong class="pn '+notaCls(pxcN)+'">'+pxcN.toFixed(1)+'</strong><span style="font-size:10px;color:var(--ink3);margin-left:4px">(solo lectura)</span>':'<span style="color:var(--ink3)">Sin calificar</span>')+'</div></div>';
   }
-
   const bodyEl=document.getElementById('sv-body');
-  if(bodyEl)bodyEl.innerHTML=html;
-
-  // Nota final desde acumNota
+  if(bodyEl)bodyEl.innerHTML=bodyHtml;
   const co2=getC(cId);
   const nf=acumNota(data,stuId,co2?.evalMode||'normal');
   const nfEl=document.getElementById('sv-nota-final');
@@ -12314,7 +12263,7 @@ function renderStuView(){
 
 
 function _svRenderAct(act, stuId, data){
-  if(!_svBuf[act.id])_svBuf[act.id]={obt:'',pos:'',posFixed:false,comments:[]};
+  if(!_svBuf[act.id])_svBuf[act.id]={obt:'',pos:'',posFixed:false,comments:[],entregas:{}};
   const buf = _svBuf[act.id];
 
   const isAttAuto  = !!(act.auto && !act.partBank && !act.tareasBank);
@@ -12323,53 +12272,69 @@ function _svRenderAct(act, stuId, data){
   const isEntregasAct = act.actType === 'entregas';
   const pilar = act.pilar || 'saber';
 
-  // Nota guardada (siempre desde datos reales)
+  // Nota guardada
   const nota = getActNota(data, act, stuId);
   const hasNota = nota !== null;
   const dotColor = hasNota
     ? (nota>=4.5?'#22C55E':nota>=4?'#5C8A2E':nota>=3.5?'#7D6B12':nota>=3?'#7D4912':'#EF4444')
     : 'var(--br)';
-  const cmts = buf.comments || [];
+
+  // Normalizar comentarios: soportar {texto} y {text} (formato legacy)
+  const rawCmts = buf.comments || [];
+  const cmts = rawCmts.map(function(cm){
+    return {fecha: cm.fecha||'', texto: cm.texto||cm.text||''};
+  });
+
   const editId = 'sv-edit-' + act.id;
 
   // ── Cabecera (siempre visible) ──
+  const canExpand = !isAttAuto && !isBankAuto;
   const header =
-    '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--sf);cursor:pointer"' +
-    ' onclick="svToggleEdit(\'' + act.id + '\')">' +
+    '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--sf);' +
+    (canExpand ? 'cursor:pointer' : 'opacity:.88') + '"' +
+    (canExpand ? ' onclick="svToggleEdit(\'' + act.id + '\')"' : '') + '>' +
     '<span style="width:10px;height:10px;border-radius:50%;background:' + dotColor +
     ';flex-shrink:0;border:1px solid rgba(0,0,0,.1)"></span>' +
     '<span style="flex:1;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
     esc(act.name || 'Sin nombre') + '</span>' +
-    (isAttAuto  ? '<span style="font-size:10px;color:var(--ink3)">🔒 auto</span>' : '') +
+    (isAttAuto ? '<span style="font-size:10px;color:var(--ink3)">\ud83d\udd12 auto</span>' : '') +
     '<span class="pn ' + (hasNota ? notaCls(nota) : 'em') + '" style="font-size:13px;font-weight:700;min-width:32px;text-align:right">' +
-    (hasNota ? nota.toFixed(1) : '—') + '</span>' +
+    (hasNota ? nota.toFixed(1) : '\u2014') + '</span>' +
     (cmts.length ? '<span style="font-size:10px;background:var(--ac);color:#fff;border-radius:10px;padding:1px 5px">' +
-    cmts.length + '💬</span>' : '') +
-    '<span style="font-size:10px;color:var(--ink3);margin-left:2px">' + (isAttAuto ? '' : '✎') + '</span>' +
+    cmts.length + '\ud83d\udcac</span>' : '') +
+    (!isAttAuto && !isBankAuto ? '<span style="font-size:10px;color:var(--ink3)">\u270e</span>' : '') +
     '</div>';
 
-  // ── Contenido del panel colapsable ──
+  // ── Comentarios SIEMPRE VISIBLES (fuera del panel colapsable) ──
+  const cmtsVisible = cmts.length ?
+    '<div style="margin:0 10px 6px;display:flex;flex-direction:column;gap:3px">' +
+    cmts.map(function(cm, i){
+      return '<div style="display:flex;align-items:flex-start;gap:6px;' +
+        'background:rgba(99,102,241,.07);border-left:3px solid var(--ac);' +
+        'border-radius:0 var(--rs) var(--rs) 0;padding:4px 8px;font-size:11px">' +
+        (cm.fecha ? '<span style="color:var(--ink3);flex-shrink:0;font-size:10px">' + esc(cm.fecha) + '</span>' : '') +
+        '<span style="flex:1;color:var(--ink)">' + esc(cm.texto) + '</span>' +
+        '<button onclick="svDelCmt(\'' + act.id + '\',' + i + ')" ' +
+        'style="border:none;background:none;color:var(--err);cursor:pointer;font-size:11px;padding:0;flex-shrink:0">\u2715</button>' +
+        '</div>';
+    }).join('') + '</div>' : '';
+
+  // ── Panel colapsable (edición + campo de nuevo comentario) ──
   let panelContent = '';
 
   if(isAttAuto){
-    panelContent =
-      '<div style="padding:8px 12px;font-size:11px;color:var(--ink3);font-style:italic">' +
+    panelContent = '<div style="padding:8px 12px;font-size:11px;color:var(--ink3);font-style:italic">' +
       'Nota calculada automáticamente desde asistencia. Solo lectura.</div>';
-
   } else if(isBankAuto){
-    // Banco de participación o tareas — controles +/- inline
     const bKey = act.partBank ? 'participacion_' + pilar : 'tareas_' + pilar;
     const bMaxKey = act.partBank ? 'partMax_' + pilar : 'tareasMax_' + pilar;
     const bEntries = (data[bKey] || {})[stuId] || [];
     const bMax = data[bMaxKey] || 10;
-    const bTotal = act.partBank
-      ? partTotal(bEntries)
-      : tareasTotal(bEntries);
+    const bTotal = act.partBank ? partTotal(bEntries) : tareasTotal(bEntries);
     const pct = bMax > 0 ? Math.min(100, Math.round(bTotal / bMax * 100)) : 0;
     const barColor = nota !== null
       ? (nota>=4.5?'#22C55E':nota>=4?'#5C8A2E':nota>=3.5?'#7D6B12':nota>=3?'#7D4912':'#8B2D27')
       : 'var(--br)';
-
     panelContent =
       '<div style="padding:8px 12px;display:flex;flex-direction:column;gap:6px">' +
       '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
@@ -12378,14 +12343,12 @@ function _svRenderAct(act, stuId, data){
       '<button class="btn xs" onclick="svBankAdj(\'' + act.id + '\',\'' + pilar + '\',' + (act.partBank?1:0) + ',1)">+1</button>' +
       '<button class="btn xs" onclick="svBankAdj(\'' + act.id + '\',\'' + pilar + '\',' + (act.partBank?1:0) + ',2)">+2</button>' +
       '<button class="btn xs" onclick="svBankAdj(\'' + act.id + '\',\'' + pilar + '\',' + (act.partBank?1:0) + ',3)">+3</button>' +
-      '<button class="btn xs danger" onclick="svBankAdj(\'' + act.id + '\',\'' + pilar + '\',' + (act.partBank?1:0) + ',-1)" style="opacity:.7">−1</button>' +
+      '<button class="btn xs danger" onclick="svBankAdj(\'' + act.id + '\',\'' + pilar + '\',' + (act.partBank?1:0) + ',-1)" style="opacity:.7">\u22121</button>' +
       '</div>' +
       '<div style="height:5px;background:var(--br);border-radius:3px;overflow:hidden">' +
       '<div id="sv-bar-' + act.id + '" style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:3px;transition:width .25s,background .25s"></div>' +
       '</div></div>';
-
   } else if(isBancoCustom){
-    // Banco personalizado — mismos controles que renderAeList
     const sc = ((data.scores || {})[stuId] || {})[act.id] || {};
     const pts = buf.obt !== '' ? Number(buf.obt) : (sc.obt !== undefined ? sc.obt : 0);
     const maxPts = act.maxPtsBanco || 10;
@@ -12394,94 +12357,116 @@ function _svRenderAct(act, stuId, data){
     const barColor = notaB !== null
       ? (notaB>=4.5?'#22C55E':notaB>=4?'#5C8A2E':notaB>=3.5?'#7D6B12':notaB>=3?'#7D4912':'#8B2D27')
       : 'var(--br)';
-
     panelContent =
       '<div style="padding:8px 12px;display:flex;flex-direction:column;gap:6px">' +
       '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
-      '<span class="ae-banco-pts" style="font-size:11px;color:var(--ink3)">Pts: <strong id="sv-bpts-' + act.id + '">' + (pts > 0 ? '+' : '') + pts + '</strong> / máx ' + maxPts + '</span>' +
+      '<span class="ae-banco-pts" style="font-size:11px;color:var(--ink3)">Pts: <strong id="sv-bpts-' + act.id + '">' + (pts > 0 ? '+' : '') + pts + '</strong> / m\xe1x ' + maxPts + '</span>' +
       '<button class="btn xs" style="opacity:.65" onclick="svBancoAdj(\'' + act.id + '\',0)">+0</button>' +
       '<button class="btn xs" onclick="svBancoAdj(\'' + act.id + '\',1)">+1</button>' +
       '<button class="btn xs" onclick="svBancoAdj(\'' + act.id + '\',2)">+2</button>' +
       '<button class="btn xs" onclick="svBancoAdj(\'' + act.id + '\',3)">+3</button>' +
-      '<button class="btn xs danger" onclick="svBancoAdj(\'' + act.id + '\',-1)" style="opacity:.7">−1</button>' +
+      '<button class="btn xs danger" onclick="svBancoAdj(\'' + act.id + '\',-1)" style="opacity:.7">\u22121</button>' +
       '</div>' +
       '<div style="height:5px;background:var(--br);border-radius:3px;overflow:hidden">' +
       '<div id="sv-bar-' + act.id + '" style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:3px;transition:width .25s,background .25s"></div>' +
       '</div></div>';
-
   } else if(isEntregasAct){
-    const entBuf=buf.entregas||{};
-    const entScores=((data.scores||{})[stuId]||{})[act.id]?.entregas||{};
-    panelContent='<div style="padding:8px 12px;display:flex;flex-direction:column;gap:6px">'+
+    const entBuf = buf.entregas || {};
+    const entScores = ((data.scores || {})[stuId] || {})[act.id]?.entregas || {};
+    panelContent = '<div style="padding:8px 12px;display:flex;flex-direction:column;gap:6px">' +
       (act.entregas||[]).map(function(e){
-        const stored=entBuf[e.id];
-        const curObt=stored!==undefined&&stored!==''?stored:(entScores[e.id]?.obt??'');
-        const nota=curObt!==''&&curObt!==undefined?(e.modoNota?Number(curObt):calcNota(Number(curObt),e.posibles||1)):null;
-        return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;border-bottom:1px solid var(--br)">'+
-          '<span style="flex:1;font-size:12px;font-weight:600">'+esc(e.name)+'</span>'+
-          '<span style="font-size:10px;color:var(--ink3)">'+e.peso+'%'+(e.modoNota?'':(e.posibles?' / '+e.posibles+' pts':''))+'</span>'+
-          '<input type="number" min="'+(e.modoNota?'1':'0')+'" '+(e.modoNota?'max="5" ':'')+
-          'step="'+(e.modoNota?'0.1':'0.5')+'" value="'+curObt+'" placeholder="'+(e.modoNota?'nota':'pts')+'"'+
-          ' data-act="'+act.id+'" data-eid="'+e.id+'" data-peso="'+e.peso+'"'+
-          ' data-modo="'+(e.modoNota?'1':'0')+'" data-pos="'+(e.posibles||1)+'"'+
-          ' style="width:64px;font-size:13px;font-weight:700;text-align:center;border:1px solid var(--br);border-radius:var(--rs);padding:4px 6px"'+
-          ' oninput="svEntregaInput(this)">'+
-          '<span id="sv-en-'+act.id+'-'+e.id+'" class="pn '+(nota!==null?notaCls(nota):'em')+'" style="font-size:12px;font-weight:700;min-width:32px;text-align:right">'+
-          (nota!==null?nota.toFixed(1):'—')+'</span>'+
+        const stored = entBuf[e.id];
+        const curObt = stored !== undefined && stored !== '' ? stored : (entScores[e.id]?.obt ?? '');
+        const nota2 = curObt !== '' && curObt !== undefined ? (e.modoNota ? Number(curObt) : calcNota(Number(curObt), e.posibles||1)) : null;
+        return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;border-bottom:1px solid var(--br)">' +
+          '<span style="flex:1;font-size:12px;font-weight:600">' + esc(e.name) + '</span>' +
+          '<span style="font-size:10px;color:var(--ink3)">' + e.peso + '%' + (e.modoNota ? '' : (e.posibles ? ' / ' + e.posibles + ' pts' : '')) + '</span>' +
+          '<input type="number" min="' + (e.modoNota?'1':'0') + '" ' + (e.modoNota?'max="5" ':'') +
+          'step="' + (e.modoNota?'0.1':'0.5') + '" value="' + curObt + '" placeholder="' + (e.modoNota?'nota':'pts') + '"' +
+          ' data-act="' + act.id + '" data-eid="' + e.id + '" data-peso="' + e.peso + '"' +
+          ' data-modo="' + (e.modoNota?'1':'0') + '" data-pos="' + (e.posibles||1) + '"' +
+          ' style="width:64px;font-size:13px;font-weight:700;text-align:center;border:1px solid var(--br);border-radius:var(--rs);padding:4px 6px"' +
+          ' oninput="svEntregaInput(this)">' +
+          '<span id="sv-en-' + act.id + '-' + e.id + '" class="pn ' + (nota2!==null?notaCls(nota2):'em') + '" style="font-size:12px;font-weight:700;min-width:32px;text-align:right">' +
+          (nota2 !== null ? nota2.toFixed(1) : '\u2014') + '</span>' +
           '</div>';
-      }).join('')+
-      '</div>';
+      }).join('') + '</div>';
   } else {
     // Actividad normal — input editable
     const obt = buf.obt !== '' ? Number(buf.obt) : undefined;
     const pos = act.posibles || 0;
     const notaE = (obt !== undefined && pos) ? calcNota(obt, pos) : null;
     const inputVal = _svModoNota && obt !== undefined && pos
-      ? (Math.round(((obt / pos) * 4 + 1) * 10) / 10).toFixed(1)
-      : (buf.obt || '');
-
+      ? (Math.round(((obt/pos)*4+1)*10)/10).toFixed(1) : (buf.obt || '');
     panelContent =
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px">' +
       '<label style="font-size:11px;color:var(--ink3);font-weight:600">' + (_svModoNota ? 'Nota (1-5):' : 'Pts obtenidos:') + '</label>' +
-      '<input type="number" id="sv-obt-' + act.id + '" min="' + (_svModoNota ? 1 : 0) + '" ' +
-      (_svModoNota ? 'max="5" ' : '') +
-      'step="' + (_svModoNota ? 0.1 : 0.5) + '" value="' + inputVal + '" placeholder="' + (_svModoNota ? '1.0' : '0') + '"' +
+      '<input type="number" id="sv-obt-' + act.id + '" min="' + (_svModoNota?1:0) + '" ' +
+      (_svModoNota?'max="5" ':'') +
+      'step="' + (_svModoNota?0.1:0.5) + '" value="' + inputVal + '" placeholder="' + (_svModoNota?'1.0':'0') + '"' +
       ' style="width:70px;font-size:14px;font-weight:700;text-align:center;border:1px solid var(--br);border-radius:var(--rs);padding:4px 6px"' +
       ' oninput="svUpdateAct(\'' + act.id + '\',this.value)">' +
       (!_svModoNota ? '<span style="font-size:11px;color:var(--ink3)">/ ' + pos + ' pts</span>' : '') +
-      '<span id="sv-nota-' + act.id + '" class="pn ' + (notaE !== null ? notaCls(notaE) : 'em') + '" style="font-size:13px;font-weight:700;margin-left:4px">' +
-      (notaE !== null ? notaE.toFixed(1) : '—') + '</span></div>';
+      '<span id="sv-nota-' + act.id + '" class="pn ' + (notaE!==null?notaCls(notaE):'em') + '" style="font-size:13px;font-weight:700;margin-left:4px">' +
+      (notaE !== null ? notaE.toFixed(1) : '\u2014') + '</span></div>';
   }
 
-  // Sección de comentarios — siempre dentro del panel colapsable
-  const cmtsSection =
-    '<div style="padding:0 12px 8px;display:flex;flex-direction:column;gap:4px">' +
-    (cmts.length
-      ? cmts.map(function(cm, i){
-          return '<div style="display:flex;align-items:flex-start;gap:6px;background:rgba(99,102,241,.07);' +
-            'border-left:3px solid var(--ac);border-radius:0 var(--rs) var(--rs) 0;padding:4px 8px;font-size:11px">' +
-            (cm.fecha ? '<span style="color:var(--ink3);flex-shrink:0;font-size:10px">' + esc(cm.fecha) + '</span>' : '') +
-            '<span style="flex:1">' + esc(cm.texto || '') + '</span>' +
-            '<button onclick="svDelCmt(\'' + act.id + '\',' + i + ')" ' +
-            'style="border:none;background:none;color:var(--err);cursor:pointer;font-size:11px;padding:0;flex-shrink:0">✕</button>' +
-            '</div>';
-        }).join('') : '') +
-    '<div style="display:flex;gap:6px;margin-top:4px">' +
-    '<input type="text" id="sv-cmt-' + act.id + '" placeholder="Añade un comentario…"' +
+  // Campo para nuevo comentario (dentro del panel colapsable)
+  const newCmtInput =
+    '<div style="padding:4px 12px 8px;display:flex;gap:6px">' +
+    '<input type="text" id="sv-cmt-' + act.id + '" placeholder="A\xf1ade un comentario\u2026"' +
     ' style="flex:1;font-size:12px;border:1px solid var(--br);border-radius:var(--rs);padding:4px 8px"' +
     ' onkeydown="if(event.key===\'Enter\'){event.preventDefault();svAddCmt(\'' + act.id + '\');}">' +
-    '<button class="btn xs primary" onclick="svAddCmt(\'' + act.id + '\')">＋ Comentario</button>' +
-    '</div></div>';
+    '<button class="btn xs primary" onclick="svAddCmt(\'' + act.id + '\')">+ Comentario</button>' +
+    '</div>';
 
   return '<div style="border:1px solid var(--br);border-radius:var(--rs);margin-bottom:6px;overflow:hidden">' +
     header +
+    cmtsVisible +
     '<div id="' + editId + '" style="display:none;border-top:1px solid var(--br);background:var(--bg);flex-direction:column">' +
-    panelContent + cmtsSection +
+    panelContent +
+    newCmtInput +
     '</div></div>';
 }
 
 
-// Ajustar banco de participación o tareas desde la vista de estudiante
+// ── Ajustar banco de participación o tareas desde vista de estudiante ──
+function svBankAdj(actId, pilar, isPartBank, delta){
+  const data=getGrD(_sv.cId,_sv.asig,_sv.per);
+  const bKey=(isPartBank?'participacion_':'tareas_')+pilar;
+  const bMaxKey=(isPartBank?'partMax_':'tareasMax_')+pilar;
+  if(!data[bKey])data[bKey]={};
+  if(!data[bKey][_sv.stuId])data[bKey][_sv.stuId]=[];
+  if(delta!==0){
+    data[bKey][_sv.stuId].push({fecha:today(),pts:delta,desc:'Vista estudiante'});
+  }
+  _svDirty=true;
+  save();
+  markGrDirty();
+  renderStuView();
+}
+
+// ── Ajustar banco personalizado desde vista de estudiante ──
+function svBancoAdj(actId, delta){
+  const data=getGrD(_sv.cId,_sv.asig,_sv.per);
+  const act=(data.activities||[]).find(function(a){return a.id===actId;});
+  if(!act)return;
+  const maxPts=act.maxPtsBanco||10;
+  if(!_svBuf[actId])_svBuf[actId]={obt:'0',pos:'',posFixed:false,comments:[],entregas:{}};
+  const cur=_svBuf[actId].obt!==''?Number(_svBuf[actId].obt):0;
+  const newPts=cur+delta;
+  _svBuf[actId].obt=String(newPts);
+  _svDirty=true;
+  const pct=maxPts>0?Math.min(100,Math.round(newPts/maxPts*100)):0;
+  const notaB=calcNotaBanco(newPts,maxPts);
+  const barColor=notaB!==null?(notaB>=4.5?'#22C55E':notaB>=4?'#5C8A2E':notaB>=3.5?'#7D6B12':notaB>=3?'#7D4912':'#8B2D27'):'var(--br)';
+  const barEl=document.getElementById('sv-bar-'+actId);
+  if(barEl){barEl.style.width=pct+'%';barEl.style.background=barColor;}
+  const ptsEl=document.getElementById('sv-bpts-'+actId);
+  if(ptsEl)ptsEl.textContent=(newPts>0?'+':'')+newPts;
+}
+
+// ── Input de entrega individual en vista de estudiante ──
 function svEntregaInput(inp){
   const actId=inp.dataset.act;
   const entregaId=inp.dataset.eid;
@@ -12495,7 +12480,8 @@ function svEntregaInput(inp){
   _svDirty=true;
   const nota=val===''?null:(modoNota?Number(val):calcNota(Number(val),posibles));
   const el=document.getElementById('sv-en-'+actId+'-'+entregaId);
-  if(el){el.textContent=nota!==null?nota.toFixed(1):'—';el.className='pn '+(nota!==null?notaCls(nota):'em');}
+  if(el){el.textContent=nota!==null?nota.toFixed(1):'\u2014';el.className='pn '+(nota!==null?notaCls(nota):'em');}
+  // Actualizar nota cabecera de la actividad
   const data=getGrD(_sv.cId,_sv.asig,_sv.per);
   const act=(data.activities||[]).find(function(a){return a.id===actId;});
   if(!act||!act.entregas)return;
@@ -12513,53 +12499,8 @@ function svEntregaInput(inp){
   const panel=document.getElementById('sv-edit-'+actId);
   if(panel&&panel.previousElementSibling){
     const hSpan=panel.previousElementSibling.querySelector('.pn');
-    if(hSpan){hSpan.textContent=notaFinal!==null?notaFinal.toFixed(1):'—';hSpan.className='pn '+(notaFinal!==null?notaCls(notaFinal):'em');}
+    if(hSpan){hSpan.textContent=notaFinal!==null?notaFinal.toFixed(1):'\u2014';hSpan.className='pn '+(notaFinal!==null?notaCls(notaFinal):'em');}
   }
-}
-
-
-function svBankAdj(actId, pilar, isPartBank, delta){
-  const data=getGrD(_sv.cId,_sv.asig,_sv.per);
-  const bKey=(isPartBank?'participacion_':'tareas_')+pilar;
-  const bMaxKey=(isPartBank?'partMax_':'tareasMax_')+pilar;
-  if(!data[bKey])data[bKey]={};
-  if(!data[bKey][_sv.stuId])data[bKey][_sv.stuId]=[];
-  if(delta!==0){
-    data[bKey][_sv.stuId].push({fecha:today(),pts:delta,desc:'Vista estudiante'});
-  }
-  const bMax=data[bMaxKey]||10;
-  const entries=data[bKey][_sv.stuId];
-  const total=isPartBank?partTotal(entries):tareasTotal(entries);
-  const pct=bMax>0?Math.min(100,Math.round(total/bMax*100)):0;
-  const nota2=isPartBank?partNota(total,bMax,pilar):tareasNota(total,bMax);
-  const barColor=nota2!==null?(nota2>=4.5?'#22C55E':nota2>=4?'#5C8A2E':nota2>=3.5?'#7D6B12':nota2>=3?'#7D4912':'#8B2D27'):'var(--br)';
-  const barEl=document.getElementById('sv-bar-'+actId);
-  if(barEl){barEl.style.width=pct+'%';barEl.style.background=barColor;}
-  const ptsEl=document.querySelector('#sv-edit-'+actId+' .ae-banco-pts strong, #sv-edit-'+actId+' strong');
-  // Refrescar cabecera
-  _svDirty=true;
-  save();
-  renderStuView();
-}
-
-// Ajustar banco personalizado desde la vista de estudiante
-function svBancoAdj(actId, delta){
-  const data=getGrD(_sv.cId,_sv.asig,_sv.per);
-  const act=(data.activities||[]).find(function(a){return a.id===actId;});
-  if(!act)return;
-  const maxPts=act.maxPtsBanco||10;
-  if(!_svBuf[actId])_svBuf[actId]={obt:'0',pos:'',posFixed:false,comments:[]};
-  const cur=_svBuf[actId].obt!==''?Number(_svBuf[actId].obt):0;
-  const newPts=cur+delta;
-  _svBuf[actId].obt=String(newPts);
-  _svDirty=true;
-  const pct=maxPts>0?Math.min(100,Math.round(newPts/maxPts*100)):0;
-  const notaB=calcNotaBanco(newPts,maxPts);
-  const barColor=notaB!==null?(notaB>=4.5?'#22C55E':notaB>=4?'#5C8A2E':notaB>=3.5?'#7D6B12':notaB>=3?'#7D4912':'#8B2D27'):'var(--br)';
-  const barEl=document.getElementById('sv-bar-'+actId);
-  if(barEl){barEl.style.width=pct+'%';barEl.style.background=barColor;}
-  const ptsEl=document.getElementById('sv-bpts-'+actId);
-  if(ptsEl)ptsEl.textContent=(newPts>0?'+':'')+newPts;
 }
 
 
@@ -12599,14 +12540,19 @@ function svAddCmt(actId){
   _svBuf[actId].comments.push({fecha:today(),texto:txt});
   if(inp)inp.value='';
   _svDirty=true;
-  svToggleEdit(actId);svToggleEdit(actId);
+  // Refrescar solo la sección de comentarios de esta actividad
+  renderStuView();
 }
 
 function svDelCmt(actId,idx){
-  if(!_svBuf[actId])return;
+  if(!_svBuf[actId]||!_svBuf[actId].comments)return;
+  // Normalizar formato antes de borrar
+  _svBuf[actId].comments=_svBuf[actId].comments.map(function(cm){
+    return{fecha:cm.fecha||'',texto:cm.texto||cm.text||''};
+  });
   _svBuf[actId].comments.splice(idx,1);
   _svDirty=true;
-  svToggleEdit(actId);svToggleEdit(actId);
+  renderStuView();
 }
 
 function svToggleModo(){
