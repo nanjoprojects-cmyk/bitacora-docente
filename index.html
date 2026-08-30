@@ -12288,7 +12288,7 @@ function _svRenderAct(act, stuId, data){
   const editId = 'sv-edit-' + act.id;
 
   // ── Cabecera (siempre visible) ──
-  const canExpand = !isAttAuto && !isBankAuto;
+  const canExpand = !isAttAuto; // banco auto también es expandible
   const header =
     '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--sf);' +
     (canExpand ? 'cursor:pointer' : 'opacity:.88') + '"' +
@@ -12586,9 +12586,18 @@ function svSave(){
     const buf=_svBuf[actId];
     const act=(data.activities||[]).find(function(a){return a.id===actId;});
     if(!act)return;
-    // Nunca tocar actividades automáticas (asistencia, bancos auto)
-    // — su nota se calcula en tiempo real y no debe borrarse
-    if(act.auto||act.partBank||act.tareasBank)return;
+    // Actividad de asistencia automática pura — no tocar nada
+    if(act.auto&&!act.partBank&&!act.tareasBank)return;
+    // Bancos auto (partBank/tareasBank): solo guardar comentarios,
+    // nunca tocar data.scores[stuId][actId].obt (nota calculada en vivo)
+    if(act.partBank||act.tareasBank){
+      const hasCmtsBanco=(buf.comments&&buf.comments.length>0);
+      if(hasCmtsBanco){
+        if(!data.scores[_sv.stuId][actId])data.scores[_sv.stuId][actId]={};
+        data.scores[_sv.stuId][actId].comments=buf.comments;
+      }
+      return;
+    }
     const hasCmts=(buf.comments&&buf.comments.length>0);
     const hasObt=(buf.obt!==''&&buf.obt!==undefined);
     if(act.actType==='entregas'){
