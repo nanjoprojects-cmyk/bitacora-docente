@@ -7177,8 +7177,30 @@ function addPlanMejoramiento(stuId, nombre, cId){
 
 function delLlamado(i){
   if(!confirm('¿Eliminar este llamado de atención?'))return;
-  getSeg(fichaStId).llamados.splice(i,1);
+  const seg=getSeg(fichaStId);
+  const ll=seg.llamados[i];
+  seg.llamados.splice(i,1);
   fichaChanged_flag=true;
+  // Si es un comentario de actividad, eliminarlo también de data.scores
+  if(ll&&ll.tipo==='comentario_actividad'&&ll.actId&&ll.commentId){
+    try{
+      const data=getGrD(ll.cId||fichaCId,ll.asig||'',ll.per||_fichaPer||'');
+      if(data.scores?.[fichaStId]?.[ll.actId]?.comments){
+        const ci=data.scores[fichaStId][ll.actId].comments.findIndex(function(c){
+          return c.id===ll.commentId;
+        });
+        if(ci>=0){
+          data.scores[fichaStId][ll.actId].comments.splice(ci,1);
+          // Si la ventana de calificación está abierta para esa actividad, actualizar buffer
+          if(_ae.actId===ll.actId&&_aeBuf[fichaStId]?.comments){
+            _aeBuf[fichaStId].comments=data.scores[fichaStId][ll.actId].comments.slice();
+          }
+          save();
+        }
+      }
+    }catch(e){}
+  }
+  saveSeg();
   renderLlamados();
 }
 
@@ -10848,14 +10870,34 @@ function aeAddCmt(stuId){
     if(!seg.llamados)seg.llamados=[];
     seg.llamados.unshift({id:uid(),fecha,
       desc:'Comentario en "'+esc(act.name)+'": '+text+(nota!==null?' · nota: '+nota.toFixed(1):''),
-      estado:'informado',tipo:'comentario_actividad'});
+      estado:'informado',tipo:'comentario_actividad',
+      commentId:cmt.id,actId:actId,cId:cId,asig:asig,per:per});
     saveSeg();
   }
   save();
 }
 function aeDelCmt(stuId,idx){
   if(!_aeBuf[stuId]?.comments)return;
+  const cmt=_aeBuf[stuId].comments[idx];
   _aeBuf[stuId].comments.splice(idx,1);
+  // Persistir eliminación en data.scores
+  const{actId,cId,asig,per}=_ae;
+  const data=getGrD(cId,asig,per);
+  if(data.scores?.[stuId]?.[actId]){
+    data.scores[stuId][actId].comments=_aeBuf[stuId].comments.slice();
+  }
+  // Eliminar llamado correspondiente del historial
+  if(cmt){
+    const seg=getSeg(stuId);
+    const li=(seg.llamados||[]).findIndex(function(l){
+      return l.tipo==='comentario_actividad'&&(
+        (l.commentId&&l.commentId===cmt.id)||
+        (l.fecha===cmt.fecha&&l.desc&&l.desc.includes(cmt.texto||cmt.text||''))
+      );
+    });
+    if(li>=0){seg.llamados.splice(li,1);saveSeg();}
+  }
+  save();
   renderAeList();
 }
 function aeEditCmt(stuId,idx){
@@ -12607,22 +12649,56 @@ function svAddCmt(actId){
   const inp=document.getElementById('sv-cmt-'+actId);
   const txt=(inp?.value||'').trim();
   if(!txt)return;
-  if(!_svBuf[actId])_svBuf[actId]={obt:'',pos:'',posFixed:false,comments:[]};
-  _svBuf[actId].comments.push({fecha:today(),texto:txt});
+  if(!_svBuf[actId])_svBuf[actId]={obt:'',pos:'',posFixed:false,comments:[],entregas:{}};
+  if(!_svBuf[actId].comments)_svBuf[actId].comments=[];
+  const svCmt={id:uid(),fecha:today(),texto:txt};
+  _svBuf[actId].comments.push(svCmt);
   if(inp)inp.value='';
   _svDirty=true;
-  // Refrescar solo la sección de comentarios de esta actividad
+  // Guardar en data.scores de inmediato
+  const data=getGrD(_sv.cId,_sv.asig,_sv.per);
+  if(!data.scores)data.scores={};
+  if(!data.scores[_sv.stuId])data.scores[_sv.stuId]={};
+  if(!data.scores[_sv.stuId][actId])data.scores[_sv.stuId][actId]={};
+  data.scores[_sv.stuId][actId].comments=_svBuf[actId].comments.slice();
+  // Registrar en historial pedagógico
+  const act=(data.activities||[]).find(function(a){return a.id===actId;});
+  if(act){
+    const nota=getActNota(data,act,_sv.stuId);
+    const seg=getSeg(_sv.stuId);
+    if(!seg.llamados)seg.llamados=[];
+    seg.llamados.unshift({id:uid(),fecha:svCmt.fecha,
+      desc:'Comentario en "'+esc(act.name)+'": '+txt+(nota!==null?' · nota: '+nota.toFixed(1):''),
+      estado:'informado',tipo:'comentario_actividad',
+      commentId:svCmt.id,actId:actId,cId:_sv.cId,asig:_sv.asig,per:_sv.per});
+    saveSeg();
+  }
+  save();
   renderStuView();
 }
 
 function svDelCmt(actId,idx){
   if(!_svBuf[actId]||!_svBuf[actId].comments)return;
-  // Normalizar formato antes de borrar
-  _svBuf[actId].comments=_svBuf[actId].comments.map(function(cm){
-    return{fecha:cm.fecha||'',texto:cm.texto||cm.text||''};
-  });
+  const cmt=_svBuf[actId].comments[idx];
   _svBuf[actId].comments.splice(idx,1);
   _svDirty=true;
+  // Persistir en data.scores
+  const data=getGrD(_sv.cId,_sv.asig,_sv.per);
+  if(data.scores?.[_sv.stuId]?.[actId]){
+    data.scores[_sv.stuId][actId].comments=_svBuf[actId].comments.slice();
+  }
+  // Eliminar llamado correspondiente
+  if(cmt){
+    const seg=getSeg(_sv.stuId);
+    const li=(seg.llamados||[]).findIndex(function(l){
+      return l.tipo==='comentario_actividad'&&(
+        (l.commentId&&l.commentId===cmt.id)||
+        (l.fecha===cmt.fecha&&l.desc&&l.desc.includes(cmt.texto||cmt.text||''))
+      );
+    });
+    if(li>=0){seg.llamados.splice(li,1);saveSeg();}
+  }
+  save();
   renderStuView();
 }
 
