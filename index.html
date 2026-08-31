@@ -6759,8 +6759,7 @@ function _initFichaInf(){
   const prevA=asel.value;
   asel.innerHTML=subs.map(s=>'<option value="'+esc(s)+'"'+(s===prevA?' selected':'')+'>'+esc(s)+'</option>').join('');
   if(!prevA&&subs.length)asel.value=subs[0];
-  // Populate period selector
-  fillPerSel('ficha-inf-per',mainCId);
+  // El período ya viene de _fichaPer (seleccionado en Seguimiento)
   // Store resolved cId for the informe
   fichaCId=mainCId;
   renderFichaInforme();
@@ -7005,8 +7004,8 @@ function buildFichaInformeHTML(stuId,cId,asig,per){
 // ── Print ficha informe ──
 function printFichaInforme(){
   const asig=document.getElementById('ficha-inf-asig')?.value||'';
-  const per=document.getElementById('ficha-inf-per')?.value||'';
-  if(!fichaCId||!asig){toast('Selecciona asignatura y período','e');return;}
+  const per=_fichaPer||'';
+  if(!fichaCId||!asig||!per){toast('Selecciona asignatura y período en Seguimiento','e');return;}
   const html=buildFichaInformeHTML(fichaStId,fichaCId,asig,per);
   const win=window.open('','_blank','width=700,height=900');
   if(!win){toast('Activa las ventanas emergentes para imprimir','e');return;}
@@ -7046,8 +7045,8 @@ function printFichaInforme(){
 // ── Export ficha informe to Excel ──
 function exportFichaInformeExcel(){
   const asig=document.getElementById('ficha-inf-asig')?.value||'';
-  const per=document.getElementById('ficha-inf-per')?.value||'';
-  if(!fichaCId||!asig){toast('Selecciona asignatura y período','e');return;}
+  const per=_fichaPer||'';
+  if(!fichaCId||!asig||!per){toast('Selecciona asignatura y período en Seguimiento','e');return;}
   loadXLSX(()=>{
     const co=getC(fichaCId);
     const pers=getPers(fichaCId);
