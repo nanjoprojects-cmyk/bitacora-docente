@@ -10741,8 +10741,7 @@ function renderAeList(){
       <div style="display:flex;gap:5px;align-items:center;margin-top:6px">
         <input id="ae-new-cmt-${st.id}" type="text" autocomplete="off"
           style="flex:1;min-width:90px;font-size:11px;padding:4px 7px;border-radius:var(--rs);border:1px solid var(--br);background:var(--sf);color:var(--ink);cursor:pointer"
-          readonly placeholder="Escribe un comentario y pulsa ＋ Comentario…"
-          onclick="this.removeAttribute('readonly');this.placeholder='Escribe el comentario…';"
+          placeholder="Escribe un comentario y pulsa ＋ Comentario…"
           onkeydown="if(event.key==='Enter'){event.preventDefault();aeAddCmt('${st.id}');}">
         <button class="btn xs primary" onclick="aeAddCmt('${st.id}')" style="flex-shrink:0;font-size:11px;padding:4px 8px">＋ Comentario</button>
       </div>
@@ -10822,15 +10821,37 @@ function aeSetPts(stuId){
 
 function aeAddCmt(stuId){
   const inp=document.getElementById('ae-new-cmt-'+stuId);
-  const text=(inp?.value||'').trim();
+  if(!inp)return;
+  const text=inp.value.trim();
   if(!text)return;
-  const fecha=document.getElementById('ae-global-date')?.value||today();
+  const fecha=today();
   if(!_aeBuf[stuId])return;
   if(!_aeBuf[stuId].comments)_aeBuf[stuId].comments=[];
-  _aeBuf[stuId].comments.push({id:uid(),text,fecha});
+  // Crear el comentario con campos explícitos (no shorthand) para evitar ambigüedad
+  const cmt={};cmt.id=uid();cmt.text=text;cmt.fecha=fecha;
+  _aeBuf[stuId].comments.push(cmt);
   inp.value='';
+  // Renderizar primero para que el usuario vea el comentario de inmediato
   renderAeList();
-  // Don't auto-focus — on tablet this triggers keyboard
+  // Luego guardar en data.scores
+  const{actId,cId,asig,per}=_ae;
+  const data=getGrD(cId,asig,per);
+  if(!data.scores)data.scores={};
+  if(!data.scores[stuId])data.scores[stuId]={};
+  if(!data.scores[stuId][actId])data.scores[stuId][actId]={};
+  data.scores[stuId][actId].comments=_aeBuf[stuId].comments.slice();
+  // Registrar en historial pedagógico del estudiante
+  const act=(data.activities||[]).find(function(a){return a.id===actId;});
+  if(act){
+    const nota=getActNota(data,act,stuId);
+    const seg=getSeg(stuId);
+    if(!seg.llamados)seg.llamados=[];
+    seg.llamados.unshift({id:uid(),fecha,
+      desc:'Comentario en "'+esc(act.name)+'": '+text+(nota!==null?' · nota: '+nota.toFixed(1):''),
+      estado:'informado',tipo:'comentario_actividad'});
+    saveSeg();
+  }
+  save();
 }
 function aeDelCmt(stuId,idx){
   if(!_aeBuf[stuId]?.comments)return;
@@ -12344,7 +12365,7 @@ function _svRenderAct(act, stuId, data){
         'background:rgba(99,102,241,.07);border-left:3px solid var(--ac);' +
         'border-radius:0 var(--rs) var(--rs) 0;padding:4px 8px;font-size:11px">' +
         (cm.fecha ? '<span style="color:var(--ink3);flex-shrink:0;font-size:10px">' + esc(cm.fecha) + '</span>' : '') +
-        '<span style="flex:1;color:var(--ink)">' + esc(cm.texto) + '</span>' +
+        '<span style="flex:1;color:var(--ink)">' + esc(cm.texto||cm.text||'') + '</span>' +
         '<button onclick="svDelCmt(\'' + act.id + '\',' + i + ')" ' +
         'style="border:none;background:none;color:var(--err);cursor:pointer;font-size:11px;padding:0;flex-shrink:0">\u2715</button>' +
         '</div>';
