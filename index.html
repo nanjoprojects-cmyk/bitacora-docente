@@ -884,7 +884,7 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
     </div>
     <button class="tb-btn" onclick="openHelp()" id="btn-help" title="Ayuda">❓ Ayuda</button>
     <button class="tb-btn" id="btn-fullscreen" onclick="toggleFullscreen()" title="Pantalla completa">⛶</button>
-    <button class="tb-btn" id="btn-cloud-save" onclick="cloudSaveAll()" title="Guardar todo en la nube" style="display:none">💾 Guardar</button>
+    <button class="tb-btn" id="btn-cloud-save" onclick="cloudSaveAll()" title="Sincronizar con Drive" style="display:none">💾 Guardar</button>
     <button class="tb-btn" onclick="exitApp()" title="Salir de la aplicación" style="color:rgba(255,255,255,.6)">⏻ Salir</button>
   </div>
 </div>
@@ -1105,6 +1105,7 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
           <button class="btn sm" onclick="showAttSummary()">📊 Resumen</button>
           <button class="btn sm" onclick="printAtt()" title="Imprimir planilla activa">🖨️ Imprimir</button>
           <button class="btn sm" onclick="openExportAtt()" title="Exportar asistencia a Excel">⬇ Excel</button>
+          <button class="btn sm primary" onclick="saveAttAndNotify()" title="Guardar asistencia">💾 Guardar</button>
         </div>
       </div>
       <!-- Sticky attendance bar -->
@@ -1682,6 +1683,19 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
         <label>Indicador de evaluación <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink3)">(opcional — en infinitivo)</span></label>
         <input id="eact-indicador" placeholder="Ej: resolver ecuaciones de primer grado">
       </div>
+      <!-- ENTREGAS MÚLTIPLES — solo visible al editar ese tipo -->
+      <div id="eact-entregas-wrap" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <label style="margin:0">Entregas de la actividad</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:var(--ink3)">Suma de pesos:</span>
+            <span id="eact-peso-sum" style="font-size:14px;font-weight:700;color:var(--err)">0%</span>
+          </div>
+        </div>
+        <div id="eact-entregas-list" style="display:flex;flex-direction:column;gap:6px"></div>
+        <button type="button" class="btn sm" onclick="addEntregaRowEdit()" style="margin-top:8px;width:100%">＋ Agregar entrega</button>
+        <p id="eact-peso-warn" style="display:none;font-size:11px;color:var(--err);margin-top:4px">⚠ La suma de pesos debe ser exactamente 100% para guardar.</p>
+      </div>
     </div>
     <div class="mfoot"><button class="btn" onclick="editActHasChanges()?showEditActWarn():closeEditActModal()">Cancelar</button><button class="btn primary" onclick="saveEditAct()">💾 Guardar cambios</button></div>
   </div>
@@ -1776,11 +1790,12 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
 <!-- ACTIVITY ENTRY OVERLAY -->
 <div class="ov bank-ov" id="act-entry-ov">
   <div class="bank-modal">
-    <div class="mhdr">
+    <div class="mhdr" style="flex-wrap:wrap;gap:6px">
       <div style="display:flex;flex-direction:column;gap:2px">
         <div class="mtitle" id="act-entry-title">📝 Notas</div>
         <div style="font-size:14px;color:var(--ink2);font-weight:600" id="act-entry-sub"></div>
       </div>
+      <div id="ae-hdr-extras" style="display:flex;gap:6px;align-items:center;flex:1;justify-content:flex-end"></div>
       <button class="mx" onclick="closeActEntry()">✕</button>
     </div>
     <div class="bank-body">
@@ -2650,7 +2665,7 @@ function attNotaCls(n){if(n==='DS')return'nDS';if(n==='DA')return'nDA';if(n==='D
 function renderTP(){
   if(!profile.nombre)return;
   document.getElementById('tp').style.display='flex';
-  document.getElementById('btn-cloud-save').style.display='flex';
+  // btn-cloud-save eliminado — cada sección tiene su propio Guardar
   document.getElementById('tp-av').textContent=ini(profile.nombre);
   document.getElementById('tp-nm').textContent=profile.nombre;
   document.getElementById('tb-yr').textContent=profile.anio||'2026';
@@ -2987,6 +3002,12 @@ function markAttDirty(){
   // Autoguardado inmediato en localStorage
   localStorage.setItem(SK.a,JSON.stringify(attendance));
 }
+function saveAttAndNotify(){
+  saveAtt();
+  toast('Asistencia guardada ✅','s');
+}
+
+
 function saveAtt(){
   // Refresh all auto att activities before saving
   const {cId,asig,per}=getAttK();
@@ -3773,14 +3794,140 @@ function openEditActModal(actId,cId,asig,per){
   _editActOriginal={name:act.name||'',pilar:act.pilar||'saber',posibles:String(act.posibles||''),desc:act.desc||'',indicador:act.indicador||''};
   // Clear any previous warn bar
   const prev=document.getElementById('edit-act-warn-bar');if(prev)prev.remove();
+  // Mostrar/ocultar sección entregas
+  const isEntregasEdit=act.actType==='entregas';
+  const posWrap=document.getElementById('eact-pos')?.closest('.fg');
+  if(posWrap)posWrap.style.display=isEntregasEdit?'none':'';
+  const ewrap=document.getElementById('eact-entregas-wrap');
+  if(ewrap){
+    ewrap.style.display=isEntregasEdit?'':'none';
+    if(isEntregasEdit){
+      // Cargar entregas existentes en el builder
+      const eList=document.getElementById('eact-entregas-list');
+      if(eList)eList.innerHTML='';
+      (act.entregas||[]).forEach(function(e){
+        addEntregaRowEdit(e.name,e.peso,e.posibles,e.modoNota,e.id);
+      });
+      updatePesoSumEdit();
+    }
+  }
   document.getElementById('edit-act-ov').classList.add('open');
 }
+// Builder de entregas en el modal de EDICIÓN
+function addEntregaRowEdit(name='',peso='',posibles='',modoNota=false,existingId=''){
+  const list=document.getElementById('eact-entregas-list');
+  if(!list)return;
+  const idx=_entregasIdxC++;
+  const div=document.createElement('div');
+  div.className='entrega-row-edit';
+  if(existingId)div.dataset.eid=existingId; // preservar ID original
+  div.style.cssText='display:grid;grid-template-columns:1fr 60px 80px auto auto;gap:6px;align-items:center';
+  div.innerHTML=
+    '<input placeholder="Nombre de la entrega" value="'+esc(name)+'" style="font-size:12px;padding:4px 8px;border:1px solid var(--br);border-radius:var(--rs)">'+
+    '<div style="display:flex;align-items:center;gap:2px"><input type="number" placeholder="%" value="'+peso+'" min="0" max="100" style="width:50px;font-size:12px;padding:4px 5px;border:1px solid var(--br);border-radius:var(--rs)" oninput="updatePesoSumEdit()"><span style="font-size:10px;color:var(--ink3)">%</span></div>'+
+    '<div class="entrega-pos-wrap-edit" style="display:flex;align-items:center;gap:2px"'+(modoNota?' hidden':'')+'>'+
+      '<input type="number" placeholder="pts" value="'+posibles+'" min="1" style="width:58px;font-size:12px;padding:4px 5px;border:1px solid var(--br);border-radius:var(--rs)">'+
+      '<span style="font-size:10px;color:var(--ink3)">pts</span></div>'+
+    '<label style="font-size:10px;color:var(--ink3);display:flex;align-items:center;gap:3px;cursor:pointer">'+
+      '<input type="checkbox" '+(modoNota?'checked':'')+' onchange="toggleEntregaModoEdit(this)" style="accent-color:var(--ac)">nota</label>'+
+    '<button type="button" onclick="removeEntregaRowEdit(this)" style="border:none;background:none;color:var(--err);cursor:pointer;font-size:16px;padding:0 4px" title="Eliminar entrega">✕</button>';
+  list.appendChild(div);
+  updatePesoSumEdit();
+}
+function toggleEntregaModoEdit(chk){
+  const row=chk.closest('.entrega-row-edit');
+  const pw=row.querySelector('.entrega-pos-wrap-edit');
+  if(pw)pw.hidden=chk.checked;
+}
+function removeEntregaRowEdit(btn){
+  btn.closest('.entrega-row-edit').remove();
+  updatePesoSumEdit();
+}
+function updatePesoSumEdit(){
+  const rows=[...document.querySelectorAll('#eact-entregas-list .entrega-row-edit')];
+  const total=rows.reduce((s,r)=>s+Number(r.querySelectorAll('input[type=number]')[0]?.value||0),0);
+  const el=document.getElementById('eact-peso-sum');
+  const warn=document.getElementById('eact-peso-warn');
+  if(el){el.textContent=total+'%';el.style.color=total===100?'var(--ok)':'var(--err)';}
+  if(warn)warn.style.display=total===100?'none':'block';
+}
+function getEntregasFromEdit(){
+  const rows=[...document.querySelectorAll('#eact-entregas-list .entrega-row-edit')];
+  return rows.map(function(r,i){
+    const inputs=r.querySelectorAll('input');
+    const name=inputs[0].value.trim();
+    const peso=Number(inputs[1].value||0);
+    const modoNota=inputs[3].checked;
+    const posibles=modoNota?0:Number(inputs[2].value||0);
+    // Preservar ID original si existe; para entregas nuevas usar temporal único
+    const id=r.dataset.eid||('__new_'+i);
+    return{id,name,peso,posibles,modoNota};
+  });
+}
+function _entregasActHasScores(D,actId){
+  return Object.values(D.scores||{}).some(function(ss){
+    const e=(ss[actId]||{}).entregas;
+    return e&&Object.keys(e).length>0;
+  });
+}
+function _countEntregasStudentsAffected(D,actId){
+  return Object.values(D.scores||{}).filter(function(ss){
+    const e=(ss[actId]||{}).entregas;
+    return e&&Object.keys(e).length>0;
+  }).length;
+}
+
+
 function saveEditAct(){
   const name=document.getElementById('eact-name').value.trim();
   if(!name){toast('El nombre es obligatorio','e');return;}
   const D=getGrD(_editActCId,_editActAsig,_editActPer);
   const act=D.activities.find(a=>a.id===_editActId);
   if(!act)return;
+  // ── Entregas múltiples: lógica especial ──
+  if(act.actType==='entregas'){
+    const newEntregas=getEntregasFromEdit();
+    const pesoSum=newEntregas.reduce(function(s,e){return s+e.peso;},0);
+    if(pesoSum!==100){toast('La suma de pesos debe ser 100%. Actualmente: '+pesoSum+'%','e');return;}
+    if(newEntregas.some(function(e){return !e.name;})){toast('Todas las entregas deben tener nombre','e');return;}
+    const oldEntregas=act.entregas||[];
+    const hasScores=_entregasActHasScores(D,_editActId);
+    // Detectar cambios estructurales o de pesos
+    const structChange=newEntregas.length!==oldEntregas.length;
+    const weightChange=!structChange&&newEntregas.some(function(ne,i){
+      const oe=oldEntregas[i];
+      return oe&&(ne.peso!==oe.peso||ne.posibles!==oe.posibles||ne.modoNota!==oe.modoNota);
+    });
+    if(hasScores&&(structChange||weightChange)){
+      const n=_countEntregasStudentsAffected(D,_editActId);
+      const msg=structChange
+        ?n+' estudiante(s) tienen notas en esta actividad. Las entregas eliminadas perderán sus notas guardadas. ¿Confirmar los cambios?'
+        :'Los cambios de pesos o puntos afectarán el cálculo de '+n+' estudiante(s). Las notas existentes se conservan pero la nota final cambiará. ¿Confirmar?';
+      if(!confirm(msg))return;
+      // Borrar scores de entregas eliminadas
+      if(structChange){
+        const newIds=newEntregas.map(function(e){return e.id;});
+        const oldIds=oldEntregas.map(function(e){return e.id;});
+        const removedIds=oldIds.filter(function(id){return !newIds.includes(id);});
+        Object.values(D.scores||{}).forEach(function(ss){
+          const ents=(ss[_editActId]||{}).entregas;
+          if(!ents)return;
+          removedIds.forEach(function(id){delete ents[id];});
+        });
+      }
+    }
+    // Reasignar IDs secuenciales limpios antes de guardar
+    newEntregas.forEach(function(e,i){e.id='e'+(i+1);});
+    pushUndo('Editar actividad de entregas');
+    act.name=name;
+    act.pilar=document.getElementById('eact-pilar').value;
+    act.desc=document.getElementById('eact-desc').value.trim();
+    act.indicador=document.getElementById('eact-indicador').value.trim();
+    act.entregas=newEntregas;
+    save();closeEditActModal();renderGrades();
+    toast('Actividad actualizada ✅'+(structChange&&hasScores?' — notas de entregas eliminadas borradas':''),'s');
+    return;
+  }
   pushUndo('Editar actividad');
   act.name=name;
   act.pilar=document.getElementById('eact-pilar').value;
@@ -7848,7 +7995,9 @@ function calcEntregasNota(act, stuId, data){
   entregas.forEach(function(e){
     const sc=entScores[e.id];
     if(!sc||sc.obt===''||sc.obt===undefined||sc.obt===null)return;
-    const nota=e.modoNota?Number(sc.obt):calcNota(Number(sc.obt),e.posibles||1);
+    // Usar modoNota guardado con el score, si existe; si no, el del diseño de la entrega
+    const efectivoModo=sc.modoNota!==undefined?sc.modoNota:(!!e.modoNota);
+    const nota=efectivoModo?Number(sc.obt):calcNota(Number(sc.obt),e.posibles||1);
     if(nota===null)return;
     pesoTotal+=e.peso;
     notaSum+=nota*e.peso;
@@ -10512,13 +10661,16 @@ function renderAeEntregas(act, data, studs, cId, asig, per){
     cfgBar.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--sf2);border-radius:var(--rs);padding:9px 12px;margin-bottom:8px';
     el.parentElement.insertBefore(cfgBar,el);
   }
-  cfgBar.innerHTML=
-    '<span style="font-size:12px;color:var(--ink3);font-weight:600">Entregas múltiples</span>'+
-    '<button id="ae-ent-modo-btn" onclick="toggleAeEntregasModo()" '+
-    'style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--br);background:var(--sf);color:var(--ink2);cursor:pointer;font-weight:600">'+
-    (modoNota?'🎯 Modo: Nota':'📝 Modo: Pts')+'</button>'+
-    '<span style="flex:1"></span>'+
-    '<button class="btn sm primary" onclick="saveActEntry()">💾 Guardar</button>';
+  // Poner Modo+Guardar en el header del overlay
+  const hdrExtras=document.getElementById('ae-hdr-extras');
+  if(hdrExtras){
+    hdrExtras.innerHTML=
+      '<button id="ae-ent-modo-btn" onclick="toggleAeEntregasModo()" '+
+      'style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--br);background:var(--sf);color:var(--ink2);cursor:pointer;font-weight:600">'+
+      (modoNota?'🎯 Modo: Nota':'📝 Modo: Pts')+'</button>'+
+      '<button class="btn sm primary" onclick="saveActEntry()">💾 Guardar</button>';
+  }
+  cfgBar.innerHTML='<span style="font-size:12px;color:var(--ink3);font-weight:600">Entregas múltiples</span>';
 
   // ── Número de columnas para colspan ──
   const nCols=entregas.length+3; // #, nombre, entregas, nota
@@ -10542,6 +10694,7 @@ function renderAeEntregas(act, data, studs, cId, asig, per){
     const entSaved=saved.entregas||{};
     const entBuf=(_aeBuf[st.id]||{}).entregas||{};
     const rowBg=i%2===0?'var(--sf)':'var(--sf2)';
+    const letter=_stuLetter(st.nombre);
 
     // Nota final (buffer + guardado)
     let pesoCalif=0,notaSum=0;
@@ -10587,7 +10740,7 @@ function renderAeEntregas(act, data, studs, cId, asig, per){
       return (c||cs||'').trim().length>0;
     });
 
-    const mainRow='<tr data-stu="'+st.id+'">'+
+    const mainRow='<tr data-stu="'+st.id+'" data-letter="'+letter+'">'+
       '<td style="padding:4px 5px;border:1px solid var(--br);font-size:11px;color:var(--ink3);font-weight:600;background:'+rowBg+';position:sticky;left:0;z-index:1">'+(i+1)+'</td>'+
       '<td style="padding:4px 8px;border:1px solid var(--br);font-size:12px;font-weight:600;text-align:left;white-space:nowrap;background:'+rowBg+';position:sticky;left:28px;z-index:1">'+
         '<span style="cursor:pointer" onclick="toggleAeEntCmt(\''+st.id+'\')" title="Ver/ocultar comentarios">'+esc(st.nombre)+
@@ -10602,22 +10755,59 @@ function renderAeEntregas(act, data, studs, cId, asig, per){
       const bufObj2=entBuf[e.id]; const savObj2=entSaved[e.id];
       const existCmt=(bufObj2&&typeof bufObj2==='object'?bufObj2.comment:undefined)||(savObj2?savObj2.comment:'')||'';
       return '<td style="padding:4px 6px;border:1px solid var(--br);background:var(--acl)">'+
-        '<input type="text" placeholder="Comentario para '+esc(e.name)+'..." value="'+esc(existCmt)+'"'+
+        '<div style="display:flex;align-items:center;gap:4px">'+
+        '<input type="text" id="ae-ecmt-'+st.id+'-'+e.id+'" placeholder="Comentario para '+esc(e.name)+'..." value="'+esc(existCmt)+'"'+
         ' data-sid="'+st.id+'" data-eid="'+e.id+'" data-act="'+act.id+'"'+
-        ' style="width:100%;font-size:11px;border:1px solid var(--br);border-radius:var(--rs);padding:3px 6px;background:var(--bg)"'+
-        ' oninput="aeEntregaCmt(this)"></td>';
+        ' style="flex:1;font-size:11px;border:1px solid var(--br);border-radius:var(--rs);padding:3px 6px;background:var(--bg)"'+
+        ' oninput="aeEntregaCmt(this)">'+
+        (existCmt?'<button onclick="aeDelEntregaCmt(this)" data-sid="'+st.id+'" data-eid="'+e.id+'" data-act="'+act.id+'"'+
+        ' style="border:none;background:none;color:var(--err);cursor:pointer;font-size:12px;padding:0;flex-shrink:0" title="Eliminar comentario">✕</button>':'')+
+        '</div></td>';
     }).join('');
-    const cmtRow='<tr id="ae-ent-cmt-'+st.id+'" style="display:'+(hasCmt?'':'none')+'">'+
-      '<td style="padding:2px 4px;border:1px solid var(--br);background:var(--acl);font-size:9px;color:var(--ac);text-align:center">💬</td>'+
-      '<td style="padding:4px 6px;border:1px solid var(--br);background:var(--acl);font-size:11px;color:var(--ac);font-style:italic;position:sticky;left:28px">Comentarios</td>'+
-      cmtCells+
-      '<td style="border:1px solid var(--br);background:var(--acl)"></td></tr>';
+    // Comentarios en fila de ancho completo — más espacio
+    const cmtEntradas=entregas.map(function(e){
+      const bufObj3=entBuf[e.id]; const savObj3=entSaved[e.id];
+      const ec=(bufObj3&&typeof bufObj3==='object'?bufObj3.comment:undefined)||(savObj3?savObj3.comment:'')||'';
+      return '<div style="display:flex;align-items:flex-start;gap:8px">'+
+        '<span style="font-size:11px;font-weight:600;color:var(--ink3);min-width:130px;flex-shrink:0;padding-top:5px">'+esc(e.name)+'</span>'+
+        '<textarea id="ae-ecmt-'+st.id+'-'+e.id+'" placeholder="Comentario..." rows="2"'+
+        ' data-sid="'+st.id+'" data-eid="'+e.id+'" data-act="'+act.id+'"'+
+        ' oninput="aeEntregaCmt(this)"'+
+        ' style="flex:1;font-size:12px;border:1px solid var(--br);border-radius:var(--rs);'+
+        'padding:5px 8px;background:var(--bg);color:var(--ink);resize:vertical;min-height:46px">'+ec+'<\/textarea>'+
+        // Botones: ✕ eliminar + 💾 guardar este comentario
+        '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">'+
+        (ec?'<button onclick="aeDelEntregaCmt(this)" data-sid="'+st.id+'" data-eid="'+e.id+'" data-act="'+act.id+'"'+
+        ' style="border:none;background:none;color:var(--err);cursor:pointer;font-size:13px;padding:0;line-height:1" title="Eliminar comentario">✕</button>':'')+
+        '<button onclick="saveEntregaCmt(\''+st.id+'\',\''+e.id+'\')"'+
+        ' style="border:none;background:var(--ac);color:#fff;cursor:pointer;font-size:11px;'+
+        'padding:3px 7px;border-radius:var(--rs);font-weight:600;line-height:1;white-space:nowrap"'+
+        ' title="Guardar este comentario">💾 Guardar</button>'+
+        '</div>'+
+        '</div>';
+    }).join('');
+    const cmtRow='<tr id="ae-ent-cmt-'+st.id+'" style="display:none">'+
+      '<td colspan="'+nCols+'" style="padding:10px 14px;border:1px solid var(--br);border-bottom:2px solid var(--ac);background:var(--acl)">'+
+      '<div style="font-size:10px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">💬 Comentarios por entrega</div>'+
+      '<div style="display:flex;flex-direction:column;gap:8px">'+cmtEntradas+'</div>'+
+      '</td></tr>';
 
     return mainRow+cmtRow;
   }).join('');
 
   el.innerHTML='<table style="border-collapse:collapse;font-size:12px;min-width:100%;width:max-content">'+
     thead+'<tbody>'+tbody+'</tbody></table>';
+}
+
+// Scroll al estudiante por letra del índice
+function _aeEntregasScrollLetter(letter){
+  const list=document.getElementById('ae-list');
+  if(!list)return;
+  const target=list.querySelector('tr[data-letter="'+letter+'"]');
+  if(!target)return;
+  target.scrollIntoView({behavior:'smooth',block:'nearest'});
+  target.style.outline='2px solid var(--ac)';
+  setTimeout(function(){target.style.outline='';},600);
 }
 
 // Toggle fila de comentarios por estudiante
@@ -10628,13 +10818,97 @@ function toggleAeEntCmt(stuId){
 
 // Toggle modo pts/nota para entregas
 function toggleAeEntregasModo(){
-  _aeModoNota=!_aeModoNota;
   const data=getGrD(_ae.cId,_ae.asig,_ae.per);
   const act=(data.activities||[]).find(function(a){return a.id===_ae.actId;});
-  if(act)renderAeEntregas(act,data,getStuDs(_ae.cId,_ae.per),_ae.cId,_ae.asig,_ae.per);
+  if(!act)return;
+  _aeModoNota=!_aeModoNota;
+  // Convertir valores del buffer entre modos (igual que actividades normales)
+  Object.keys(_aeBuf).forEach(function(stuId){
+    const ents=(_aeBuf[stuId]||{}).entregas||{};
+    act.entregas.forEach(function(e){
+      if(e.modoNota)return; // entregas fijas en nota no se convierten
+      const v=ents[e.id];
+      const rawObt=v&&typeof v==='object'?v.obt:v;
+      if(rawObt===''||rawObt===undefined||rawObt===null)return;
+      const numObt=Number(rawObt);
+      if(isNaN(numObt))return;
+      let newObt;
+      if(_aeModoNota){
+        newObt=calcNota(numObt,e.posibles||1); // pts → nota
+      } else {
+        const pos=e.posibles||1;
+        newObt=Math.round(((numObt-3)/2*pos)*10)/10;
+        newObt=Math.max(0,Math.min(pos,newObt)); // nota → pts
+      }
+      if(newObt===null||isNaN(newObt))return;
+      if(v&&typeof v==='object'){
+        v.obt=newObt;v.modoNota=_aeModoNota;
+      } else {
+        ents[e.id]={obt:newObt,modoNota:_aeModoNota};
+      }
+    });
+  });
+  renderAeEntregas(act,data,getStuDs(_ae.cId,_ae.per),_ae.cId,_ae.asig,_ae.per);
 }
 
 // Input de comentario por entrega
+function aeDelEntregaCmt(btn){
+  const stuId=btn.dataset.sid;
+  const eId=btn.dataset.eid;
+  // Limpiar el input
+  const inp=document.getElementById('ae-ecmt-'+stuId+'-'+eId);
+  if(inp)inp.value='';
+  // Limpiar en el buffer
+  if(_aeBuf[stuId]?.entregas?.[eId]?.comment!==undefined){
+    _aeBuf[stuId].entregas[eId].comment='';
+  }
+  // Ocultar el botón ✕
+  btn.style.display='none';
+}
+
+
+function saveEntregaCmt(stuId, eId){
+  const inp=document.getElementById('ae-ecmt-'+stuId+'-'+eId);
+  if(!inp)return;
+  // Actualizar buffer con el valor actual del textarea
+  aeEntregaCmt(inp);
+  // Guardar en data.scores de inmediato
+  const{actId,cId,asig,per}=_ae;
+  const data=getGrD(cId,asig,per);
+  if(!data.scores)data.scores={};
+  if(!data.scores[stuId])data.scores[stuId]={};
+  if(!data.scores[stuId][actId])data.scores[stuId][actId]={};
+  if(!data.scores[stuId][actId].entregas)data.scores[stuId][actId].entregas={};
+  const buf=(_aeBuf[stuId]||{}).entregas||{};
+  const v=buf[eId];
+  const isObj=v&&typeof v==='object';
+  const comment=isObj&&v.comment?v.comment:'';
+  const obt=isObj?v.obt:v;
+  const hasObt=obt!==''&&obt!==undefined&&obt!==null;
+  const prev=data.scores[stuId][actId].entregas[eId]||{};
+  if(!hasObt&&!comment){
+    delete data.scores[stuId][actId].entregas[eId];
+  } else {
+    const entry={...prev,...(hasObt?{obt:Number(obt)}:{})};
+    if(comment){entry.comment=comment;}else{delete entry.comment;}
+    data.scores[stuId][actId].entregas[eId]=entry;
+  }
+  save();
+  // Feedback visual en el botón
+  const btns=inp.parentElement?.querySelectorAll('button');
+  const saveBtn=[...btns||[]].find(b=>b.textContent.includes('Guardar'));
+  if(saveBtn){
+    const orig=saveBtn.textContent;
+    saveBtn.textContent='✅';
+    saveBtn.style.background='var(--ok,#22C55E)';
+    setTimeout(function(){saveBtn.textContent=orig;saveBtn.style.background='var(--ac)';},1200);
+  }
+  // Mostrar/ocultar botón ✕ según si hay comentario
+  const delBtn=[...btns||[]].find(b=>b.textContent==='✕');
+  if(delBtn)delBtn.style.display=comment?'':'none';
+}
+
+
 function aeEntregaCmt(inp){
   const stuId=inp.dataset.sid;
   const eId=inp.dataset.eid;
@@ -10659,8 +10933,9 @@ function aeEntregaInput(inp){
   if(!_aeBuf[stuId])_aeBuf[stuId]={obt:'',pos:'',posFixed:false,comments:[],entregas:{}};
   if(!_aeBuf[stuId].entregas)_aeBuf[stuId].entregas={};
   const prevEnt=_aeBuf[stuId].entregas[entregaId];
-  const prevComment=prevEnt&&typeof prevEnt==='object'?prevEnt.comment:'';
-  _aeBuf[stuId].entregas[entregaId]={obt:val===''?'':Number(val),...(prevComment?{comment:prevComment}:{})};
+  const prevComment=prevEnt&&typeof prevEnt==='object'?(prevEnt.comment||''):'';
+  // Guardar obt + comment + modoNota efectivo para calcular correctamente
+  _aeBuf[stuId].entregas[entregaId]={obt:val===''?'':Number(val),comment:prevComment,modoNota:modoNota};
   const nota=val===''?null:(modoNota?Number(val):calcNota(Number(val),posibles));
   // Recalcular nota final del estudiante
   const data=getGrD(_ae.cId,_ae.asig,_ae.per);
@@ -10673,7 +10948,8 @@ function aeEntregaInput(inp){
     const raw=entBuf[e.id];
     const obt=raw&&raw.obt!==''&&raw.obt!==undefined?raw.obt:(entScores[e.id]?.obt??'');
     if(obt===''||obt===undefined)return;
-    const n=e.modoNota?Number(obt):calcNota(Number(obt),e.posibles||1);
+    const efectiveModo=_aeModoNota||(!!e.modoNota);
+    const n=efectiveModo?Number(obt):calcNota(Number(obt),e.posibles||1);
     if(n===null)return;
     pesoCalif+=e.peso;notaSum+=n*e.peso;
   });
@@ -11119,11 +11395,13 @@ saveActEntry=function(){
           delete data.scores[st.id][act.id].entregas[eId];
         } else {
           const prev=data.scores[st.id][act.id].entregas[eId]||{};
-          data.scores[st.id][act.id].entregas[eId]={
-            ...prev,
-            ...(hasObt?{obt:Number(obt)}:{}),
-            ...(comment?{comment}:{})
-          };
+          const entry={...prev,...(hasObt?{obt:Number(obt)}:{})};
+          // Manejar comment explícitamente para no conservar valores viejos
+          if(comment){entry.comment=comment;}else{delete entry.comment;}
+          // Guardar modoNota efectivo para recalcular correctamente
+          const vModo=isObj&&v.modoNota!==undefined?v.modoNota:undefined;
+          if(vModo!==undefined){entry.modoNota=vModo;}else{delete entry.modoNota;}
+          data.scores[st.id][act.id].entregas[eId]=entry;
         }
       });
     });
@@ -12408,8 +12686,10 @@ function _svRenderAct(act, stuId, data){
         'border-radius:0 var(--rs) var(--rs) 0;padding:4px 8px;font-size:11px">' +
         (cm.fecha ? '<span style="color:var(--ink3);flex-shrink:0;font-size:10px">' + esc(cm.fecha) + '</span>' : '') +
         '<span style="flex:1;color:var(--ink)">' + esc(cm.texto||cm.text||'') + '</span>' +
+        '<button onclick="svEditCmt(\'' + act.id + '\',' + i + ')" ' +
+        'style="border:none;background:none;color:var(--ac);cursor:pointer;font-size:11px;padding:0;flex-shrink:0" title="Editar">\u270e</button> ' +
         '<button onclick="svDelCmt(\'' + act.id + '\',' + i + ')" ' +
-        'style="border:none;background:none;color:var(--err);cursor:pointer;font-size:11px;padding:0;flex-shrink:0">\u2715</button>' +
+        'style="border:none;background:none;color:var(--err);cursor:pointer;font-size:11px;padding:0;flex-shrink:0" title="Eliminar">\u2715</button>' +
         '</div>';
     }).join('') + '</div>' : '';
 
@@ -12488,16 +12768,23 @@ function _svRenderAct(act, stuId, data){
     const entScores = ((data.scores || {})[stuId] || {})[act.id]?.entregas || {};
     panelContent = '<div style="padding:8px 12px;display:flex;flex-direction:column;gap:6px">' +
       (act.entregas||[]).map(function(e){
+        // Extraer obt del buffer (puede ser objeto {obt,comment,modoNota} o valor directo)
         const stored = entBuf[e.id];
-        const curObt = stored !== undefined && stored !== '' ? stored : (entScores[e.id]?.obt ?? '');
-        const nota2 = curObt !== '' && curObt !== undefined ? (e.modoNota ? Number(curObt) : calcNota(Number(curObt), e.posibles||1)) : null;
+        const storedObt = stored && typeof stored==='object' ? stored.obt : stored;
+        const storedModo = stored && typeof stored==='object' && stored.modoNota!==undefined ? stored.modoNota : null;
+        const savedEntry = entScores[e.id];
+        const savedObt = savedEntry && typeof savedEntry==='object' ? savedEntry.obt : savedEntry;
+        const savedModo = savedEntry && typeof savedEntry==='object' && savedEntry.modoNota!==undefined ? savedEntry.modoNota : null;
+        const curObt = (storedObt!==undefined&&storedObt!==''&&storedObt!==null) ? storedObt : (savedObt??'');
+        const efectiveModo = storedModo!==null ? storedModo : (savedModo!==null ? savedModo : (!!e.modoNota));
+        const nota2 = curObt!=='' ? (efectiveModo ? Number(curObt) : calcNota(Number(curObt),e.posibles||1)) : null;
         return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;border-bottom:1px solid var(--br)">' +
           '<span style="flex:1;font-size:12px;font-weight:600">' + esc(e.name) + '</span>' +
-          '<span style="font-size:10px;color:var(--ink3)">' + e.peso + '%' + (e.modoNota ? '' : (e.posibles ? ' / ' + e.posibles + ' pts' : '')) + '</span>' +
-          '<input type="number" min="' + (e.modoNota?'1':'0') + '" ' + (e.modoNota?'max="5" ':'') +
-          'step="' + (e.modoNota?'0.1':'0.5') + '" value="' + curObt + '" placeholder="' + (e.modoNota?'nota':'pts') + '"' +
+          '<span style="font-size:10px;color:var(--ink3)">' + e.peso + '%' + (efectiveModo ? '' : (e.posibles ? ' / ' + e.posibles + ' pts' : '')) + '</span>' +
+          '<input type="number" min="' + (efectiveModo?'1':'0') + '" ' + (efectiveModo?'max="5" ':'') +
+          'step="' + (efectiveModo?'0.1':'0.5') + '" value="' + curObt + '" placeholder="' + (efectiveModo?'nota':'pts') + '"' +
           ' data-act="' + act.id + '" data-eid="' + e.id + '" data-peso="' + e.peso + '"' +
-          ' data-modo="' + (e.modoNota?'1':'0') + '" data-pos="' + (e.posibles||1) + '"' +
+          ' data-modo="' + (efectiveModo?'1':'0') + '" data-pos="' + (e.posibles||1) + '"' +
           ' style="width:64px;font-size:13px;font-weight:700;text-align:center;border:1px solid var(--br);border-radius:var(--rs);padding:4px 6px"' +
           ' oninput="svEntregaInput(this)">' +
           '<span id="sv-en-' + act.id + '-' + e.id + '" class="pn ' + (nota2!==null?notaCls(nota2):'em') + '" style="font-size:12px;font-weight:700;min-width:32px;text-align:right">' +
@@ -12589,7 +12876,10 @@ function svEntregaInput(inp){
   const val=inp.value;
   if(!_svBuf[actId])_svBuf[actId]={obt:'',pos:'',posFixed:false,comments:[],entregas:{}};
   if(!_svBuf[actId].entregas)_svBuf[actId].entregas={};
-  _svBuf[actId].entregas[entregaId]=val===''?'':Number(val);
+  // Preservar comment y modoNota al actualizar el obt
+  const _prevEnt=_svBuf[actId].entregas[entregaId];
+  const _prevCmt=_prevEnt&&typeof _prevEnt==='object'?(_prevEnt.comment||''):'';
+  _svBuf[actId].entregas[entregaId]=val===''?'':{obt:Number(val),comment:_prevCmt,modoNota:modoNota};
   _svDirty=true;
   const nota=val===''?null:(modoNota?Number(val):calcNota(Number(val),posibles));
   const el=document.getElementById('sv-en-'+actId+'-'+entregaId);
@@ -12602,9 +12892,11 @@ function svEntregaInput(inp){
   let pesoCalif=0,notaSum=0;
   act.entregas.forEach(function(e){
     const raw=(_svBuf[actId]?.entregas||{})[e.id];
-    const obt=raw!==undefined&&raw!==''?raw:(entScores[e.id]?.obt??'');
+    const rawObt=raw&&typeof raw==='object'?raw.obt:raw;
+    const rawModo=raw&&typeof raw==='object'&&raw.modoNota!==undefined?raw.modoNota:(!!e.modoNota);
+    const obt=rawObt!==undefined&&rawObt!==''&&rawObt!==null?rawObt:(entScores[e.id]?.obt??'');
     if(obt===''||obt===undefined||obt===null)return;
-    const n=e.modoNota?Number(obt):calcNota(Number(obt),e.posibles||1);
+    const n=rawModo?Number(obt):calcNota(Number(obt),e.posibles||1);
     if(n===null)return;
     pesoCalif+=e.peso;notaSum+=n*e.peso;
   });
@@ -12676,6 +12968,49 @@ function svAddCmt(actId){
   save();
   renderStuView();
 }
+
+function svEditCmt(actId, idx){
+  if(!_svBuf[actId]?.comments)return;
+  const cmt=_svBuf[actId].comments[idx];
+  if(!cmt)return;
+  const oldText=cmt.texto||cmt.text||'';
+  const newText=prompt('Editar comentario:',oldText);
+  if(newText===null)return; // cancelado
+  const trimmed=newText.trim();
+  if(trimmed===oldText)return; // sin cambios
+  // Actualizar en buffer
+  _svBuf[actId].comments[idx].texto=trimmed;
+  if(_svBuf[actId].comments[idx].text!==undefined)
+    _svBuf[actId].comments[idx].text=trimmed;
+  _svDirty=true;
+  // Persistir en data.scores
+  const data=getGrD(_sv.cId,_sv.asig,_sv.per);
+  if(data.scores?.[_sv.stuId]?.[actId]?.comments){
+    const sc=data.scores[_sv.stuId][actId].comments;
+    if(sc[idx]){
+      if(sc[idx].texto!==undefined)sc[idx].texto=trimmed;
+      if(sc[idx].text!==undefined)sc[idx].text=trimmed;
+    }
+  }
+  // Actualizar llamado correspondiente en historial
+  if(cmt.id){
+    const seg=getSeg(_sv.stuId);
+    const ll=(seg.llamados||[]).find(function(l){
+      return l.tipo==='comentario_actividad'&&l.commentId===cmt.id;
+    });
+    if(ll){
+      // Reconstruir desc con el nuevo texto
+      const act=(data.activities||[]).find(function(a){return a.id===actId;});
+      const nota=act?getActNota(data,act,_sv.stuId):null;
+      ll.desc='Comentario en "'+(act?esc(act.name):actId)+'": '+trimmed+
+        (nota!==null?' · nota: '+nota.toFixed(1):'');
+      saveSeg();
+    }
+  }
+  save();
+  renderStuView();
+}
+
 
 function svDelCmt(actId,idx){
   if(!_svBuf[actId]||!_svBuf[actId].comments)return;
