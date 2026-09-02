@@ -3474,9 +3474,11 @@ function setPillar(p){
 }
 function markGrDirty(){
   grDirty=true;
-  
   // Autoguardado inmediato en localStorage
   localStorage.setItem(SK.g,JSON.stringify(grades));
+  // Los datos están guardados — limpiar el flag para no disparar
+  // el diálogo de navegación cuando el usuario ya está en la planilla
+  grDirty=false;
 }
 function saveGrades(){
   localStorage.setItem(SK.g,JSON.stringify(grades));
