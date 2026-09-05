@@ -65,6 +65,8 @@ body{font-family:'Epilogue',sans-serif;background:var(--bg);color:var(--ink);min
 body.pseudo-fs .topbar{display:none;}
 body.pseudo-fs .layout{height:100vh;height:100dvh;}
 body.pseudo-fs .main{height:100vh;height:100dvh;overflow-y:auto;}
+#btn-restore-fs{display:none;position:fixed;top:8px;right:8px;z-index:99999;background:var(--ac);color:#fff;border:none;border-radius:var(--rs);padding:6px 12px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3);}
+body.pseudo-fs #btn-restore-fs{display:flex;align-items:center;gap:6px;}
 .sidebar{width:205px;background:var(--sf);border-right:1px solid var(--br);padding:12px 8px;flex-shrink:0;overflow-y:auto;transition:width .22s ease,padding .22s ease;overscroll-behavior:contain;}
 .sidebar.collapsed{width:44px;padding:8px 4px;overflow:hidden;}
 .sidebar.collapsed .sb-sec,
@@ -150,7 +152,7 @@ td.txt{white-space:pre-wrap;word-break:break-word;line-height:1.5;color:var(--in
 .bank-alpha{display:flex;flex-direction:column;gap:1px;overflow-y:auto;flex-shrink:0;padding:4px 0;}
 .bank-alpha button{width:26px;height:22px;font-size:10px;font-weight:700;border:none;background:none;cursor:pointer;border-radius:4px;color:var(--ink3);padding:0;line-height:1;}
 .bank-alpha button:hover,.bank-alpha button.on{background:var(--ac);color:#fff;}
-.bank-students{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:5px;}
+.bank-students{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:5px;padding-bottom:env(safe-area-inset-bottom,0px);scroll-padding-bottom:env(safe-area-inset-bottom,0px);-webkit-overflow-scrolling:touch;}
 @keyframes rm-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
 .modal.shake{animation:rm-shake .35s ease;}
 .rm-warn-bar{background:#FEF3C7;border-top:1px solid #FDE68A;padding:10px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;}
@@ -1117,6 +1119,7 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
         <button id="btn-att-reverse" class="btn sm" onclick="toggleAttReverse()" title="Mostrar fecha más reciente junto al nombre">🔃</button>
         <button id="btn-att-lock" class="btn sm" onclick="toggleAttLock()" title="Bloquear edición a la fecha seleccionada">🔒</button>
         <button class="btn primary sm" onclick="openAddDateModal()" style="height:28px;font-size:11px">＋ Clase</button>
+        <button class="btn sm primary" onclick="saveAttAndNotify()" title="Guardar asistencia" style="height:28px;font-size:11px">💾 Guardar</button>
         <div style="width:1px;background:var(--br);margin:0 4px;align-self:stretch"></div>
         
         <span style="font-size:10px;color:var(--ink3)">Toca un estado para cambiarlo</span>
@@ -6590,6 +6593,8 @@ ${content}
   <span>Bitácora Docente 2026 — Nanjo Projects</span>
   <span>${now}</span>
 </div>
+  <!-- Botón restaurar pantalla completa (solo visible en modo pseudo-fs) -->
+  <button id="btn-restore-fs" onclick="toggleFullscreen()" title="Restaurar">⛶ Restaurar</button>
 </body>
 </html>`);
   win.document.close();
@@ -13561,6 +13566,22 @@ function renderSyncPanel(){
   h+='</div>';el.innerHTML=h;
 }
 init();
+
+// Scroll automático al enfocar inputs en listas de estudiantes
+// Soluciona el problema de la barra de navegación Android que tapa el último input
+(function(){
+  var LISTS='#ae-list,#part-list,#tareas-list,#pxc-list';
+  document.addEventListener('focusin',function(e){
+    var el=e.target;
+    if(!el||!(el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.tagName==='SELECT'))return;
+    if(!el.closest(LISTS))return;
+    // Delay para que la barra del sistema y el teclado se acomoden antes de scrollear
+    setTimeout(function(){
+      el.scrollIntoView({block:'nearest',behavior:'smooth'});
+    },250);
+  },true);
+})();
+
 </script>
 
 
