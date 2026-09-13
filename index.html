@@ -9779,10 +9779,9 @@ function renderPartList(cId,asig,per,pilar){
 function partTotal(entries){ return(!entries||!entries.length)?0:entries.reduce((s,e)=>s+(e.pts??0),0); }
 function partNota(pts,maxPts,pilar){
   if(!maxPts||maxPts<=0)return 3.0;
-  const allowNeg=(pilar==='saber'||pilar==='hacer');
-  const minPts=allowNeg?-maxPts:0;
+  // Todos los pilares: piso -maxPts (= nota 1.0), techo maxPts (= nota 5.0)
+  const minPts=-maxPts;
   const clamped=Math.max(minPts,Math.min(maxPts,pts));
-  // Formula: 3 + (pts/max) * 2  → range [1.0, 5.0] for saber/hacer, [3.0, 5.0] for ser
   return Math.round((3+(clamped/maxPts)*2)*10)/10;
 }
 function partAlerta(nota,pilar,label){
@@ -9811,10 +9810,10 @@ function addPart(stuId,pts,cId,asig,per,pilar){
     const data=getGrD(cId,asig,per);
     const current=partTotal((data['participacion_'+pilar]||{})[stuId]);
     const maxPts=data['partMax_'+pilar]||10;
-    const allowNeg=(pilar==='saber'||pilar==='hacer');
-    const floor=allowNeg?-maxPts:0;
+    // Todos los pilares permiten negativos hasta -maxPts (= nota 1.0)
+    const floor=-maxPts;
     if(current+pts<floor){
-      toast(allowNeg?'El total no puede bajar de −'+maxPts+' (nota 1.0)':'El total no puede quedar en negativo','e');
+      toast('El total no puede bajar de −'+maxPts+' pts (nota 1.0)','e');
       return;
     }
   }
@@ -12844,6 +12843,16 @@ function svBankAdj(actId, pilar, isPartBank, delta){
   const bMaxKey=(isPartBank?'partMax_':'tareasMax_')+pilar;
   if(!data[bKey])data[bKey]={};
   if(!data[bKey][_sv.stuId])data[bKey][_sv.stuId]=[];
+  // Validar floor: piso -maxPts (nota 1.0) para todos los pilares
+  if(delta<0){
+    const maxPts=data[bMaxKey]||10;
+    const current=partTotal(data[bKey][_sv.stuId]);
+    const floor=-maxPts;
+    if(current+delta<floor){
+      toast('El total no puede bajar de −'+maxPts+' pts (nota 1.0)','e');
+      return;
+    }
+  }
   if(delta!==0){
     data[bKey][_sv.stuId].push({fecha:today(),pts:delta,desc:'Vista estudiante'});
   }
