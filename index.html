@@ -5613,6 +5613,7 @@ function _ssAeUnsaved(){
     var ins=document.querySelectorAll('[id^="ae-new-cmt-"]');
     for(var i=0;i<ins.length;i++){if(ins[i].value&&ins[i].value.trim())return true;}
     if(!_ae||!_ae.actId||!_aeBuf)return false;
+    if(_aeEntregasPending())return true;
     var ids=Object.keys(_aeBuf);if(!ids.length)return false;
     var data=getGrD(_ae.cId,_ae.asig,_ae.per);
     var s2=function(v){return v===undefined||v===null?'':String(v);};
@@ -10646,7 +10647,7 @@ let _aeBuf={};
 
 function openActEntry(actId,cId,asig,per,focusStuId){
   _ae={actId,cId,asig,per,focusStuId:focusStuId||null};
-  _aeModoNota=false;
+  _aeModoNota=false;_aeSavedFlag=false;
   const data=getGrD(cId,asig,per);
   const act=data.activities.find(a=>a.id===actId);
   if(!act)return;
@@ -10712,11 +10713,14 @@ function closeActEntry(){
         hasChanges=true;break;
       }
     }
+    if(!hasChanges&&_aeEntregasPending())hasChanges=true;
     if(hasChanges){
       document.getElementById('conf-msg').textContent='Hay cambios sin guardar en esta actividad. ¿Cerrar sin guardar?';
       confCb=()=>{
-        document.getElementById('act-entry-ov').classList.remove('open');
+        // Descartar y cerrar con la limpieza completa (barras, config de entregas)
+        document.querySelectorAll('[id^="ae-new-cmt-"]').forEach(function(i){i.value='';});
         _aeBuf={};
+        closeActEntry();
       };
       document.getElementById('conf').classList.add('open');
       return;
@@ -10785,9 +10789,10 @@ function renderAeEntregas(act, data, studs, cId, asig, per){
       '<button id="ae-ent-modo-btn" onclick="toggleAeEntregasModo()" '+
       'style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--br);background:var(--sf);color:var(--ink2);cursor:pointer;font-weight:600">'+
       (modoNota?'🎯 Modo: Nota':'📝 Modo: Pts')+'</button>'+
-      '<button class="btn sm primary" onclick="saveActEntry()">💾 Guardar</button>';
+      '<button id="ae-save-btn" class="btn sm primary" onclick="saveActEntry()">💾 Guardar</button>';
   }
   cfgBar.innerHTML='<span style="font-size:12px;color:var(--ink3);font-weight:600">Entregas múltiples</span>';
+  _aeSaveBtnRefresh();
 
   // ── Número de columnas para colspan ──
   const nCols=entregas.length+3; // #, nombre, entregas, nota
@@ -10821,7 +10826,7 @@ function renderAeEntregas(act, data, studs, cId, asig, per){
         (typeof bufObj==='object'?bufObj.obt:bufObj):
         (savObj&&savObj.obt!==undefined&&savObj.obt!==''?savObj.obt:undefined);
       if(obt===undefined||obt===null||obt==='')return;
-      const useNota=modoNota||(!!e.modoNota);
+      const useNota=_aeEntMode(e,(bufObj!==undefined&&bufObj!==''&&bufObj!==null)?bufObj:savObj);
       const n=useNota?Number(obt):calcNota(Number(obt),e.posibles||1);
       if(n===null)return;
       pesoCalif+=e.peso;notaSum+=n*e.peso;
@@ -10834,7 +10839,7 @@ function renderAeEntregas(act, data, studs, cId, asig, per){
       const curObt=bufObj!==undefined&&bufObj!==''&&bufObj!==null?
         String(typeof bufObj==='object'?bufObj.obt:bufObj):
         (savObj&&savObj.obt!==undefined&&savObj.obt!==''?String(savObj.obt):'');
-      const useNota=modoNota||(!!e.modoNota);
+      const useNota=_aeEntMode(e,(bufObj!==undefined&&bufObj!==''&&bufObj!==null)?bufObj:savObj);
       const nota=curObt!==''?(useNota?Number(curObt):calcNota(Number(curObt),e.posibles||1)):null;
       cells+='<td style="padding:3px 4px;border:1px solid var(--br);text-align:center;background:'+rowBg+'">'+
         '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'+
@@ -10861,7 +10866,7 @@ function renderAeEntregas(act, data, studs, cId, asig, per){
       '<td style="padding:4px 5px;border:1px solid var(--br);font-size:11px;color:var(--ink3);font-weight:600;background:'+rowBg+';position:sticky;left:0;z-index:1">'+(i+1)+'</td>'+
       '<td style="padding:4px 8px;border:1px solid var(--br);font-size:12px;font-weight:600;text-align:left;white-space:nowrap;background:'+rowBg+';position:sticky;left:28px;z-index:1">'+
         '<span style="cursor:pointer" onclick="toggleAeEntCmt(\''+st.id+'\')" title="Ver/ocultar comentarios">'+esc(st.nombre)+
-        (hasCmt?' <span style="font-size:10px;color:var(--ac)">💬</span>':' <span style="font-size:10px;color:var(--br)">💬</span>')+
+        ' <span id="ae-cmt-mk-'+st.id+'" style="font-size:10px"></span>'+
         '</span></td>'+
       cells+
       '<td id="ae-ent-nota-'+st.id+'" class="pn '+(notaDisp!==null?notaCls(notaDisp):'em')+'" style="padding:4px 5px;border:1px solid var(--br);font-size:14px;font-weight:700;text-align:center">'+
@@ -10884,22 +10889,22 @@ function renderAeEntregas(act, data, studs, cId, asig, per){
     // Comentarios en fila de ancho completo — más espacio
     const cmtEntradas=entregas.map(function(e){
       const bufObj3=entBuf[e.id]; const savObj3=entSaved[e.id];
-      const ec=(bufObj3&&typeof bufObj3==='object'?bufObj3.comment:undefined)||(savObj3?savObj3.comment:'')||'';
+      const ec=(bufObj3&&typeof bufObj3==='object'&&typeof bufObj3.comment==='string')?bufObj3.comment:((savObj3&&savObj3.comment)||'');
       return '<div style="display:flex;align-items:flex-start;gap:8px">'+
         '<span style="font-size:11px;font-weight:600;color:var(--ink3);min-width:130px;flex-shrink:0;padding-top:5px">'+esc(e.name)+'</span>'+
         '<textarea id="ae-ecmt-'+st.id+'-'+e.id+'" placeholder="Comentario..." rows="2"'+
         ' data-sid="'+st.id+'" data-eid="'+e.id+'" data-act="'+act.id+'"'+
         ' oninput="aeEntregaCmt(this)"'+
         ' style="flex:1;font-size:12px;border:1px solid var(--br);border-radius:var(--rs);'+
-        'padding:5px 8px;background:var(--bg);color:var(--ink);resize:vertical;min-height:46px">'+ec+'<\/textarea>'+
+        'padding:5px 8px;background:var(--bg);color:var(--ink);resize:vertical;min-height:46px">'+esc(ec)+'<\/textarea>'+
         // Botones: ✕ eliminar + 💾 guardar este comentario
-        '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">'+
-        (ec?'<button onclick="aeDelEntregaCmt(this)" data-sid="'+st.id+'" data-eid="'+e.id+'" data-act="'+act.id+'"'+
-        ' style="border:none;background:none;color:var(--err);cursor:pointer;font-size:13px;padding:0;line-height:1" title="Eliminar comentario">✕</button>':'')+
-        '<button onclick="saveEntregaCmt(\''+st.id+'\',\''+e.id+'\')"'+
-        ' style="border:none;background:var(--ac);color:#fff;cursor:pointer;font-size:11px;'+
-        'padding:3px 7px;border-radius:var(--rs);font-weight:600;line-height:1;white-space:nowrap"'+
+        '<div style="display:flex;flex-direction:column;align-items:stretch;gap:4px;flex-shrink:0;width:104px">'+
+        '<button id="ae-ecmt-del-'+st.id+'-'+e.id+'" onclick="aeDelEntregaCmt(this)" data-sid="'+st.id+'" data-eid="'+e.id+'" data-act="'+act.id+'"'+
+        ' style="border:none;background:none;color:var(--err);cursor:pointer;font-size:13px;padding:0;line-height:1;display:'+(ec?'':'none')+'" title="Eliminar comentario">✕</button>'+
+        '<button id="ae-ecmt-btn-'+st.id+'-'+e.id+'" onclick="saveEntregaCmt(\''+st.id+'\',\''+e.id+'\')"'+
+        ' style="'+_AE_BTN+'var(--br);background:var(--sf2);color:var(--ink3)"'+
         ' title="Guardar este comentario">💾 Guardar</button>'+
+        '<span id="ae-ecmt-st-'+st.id+'-'+e.id+'" style="font-size:10px;color:#B45309;font-weight:600;line-height:1.15"></span>'+
         '</div>'+
         '</div>';
     }).join('');
@@ -10914,6 +10919,11 @@ function renderAeEntregas(act, data, studs, cId, asig, per){
 
   el.innerHTML='<table style="border-collapse:collapse;font-size:12px;min-width:100%;width:max-content">'+
     thead+'<tbody>'+tbody+'</tbody></table>';
+  // Estado real de cada comentario y de cada marcador 💬
+  studs.forEach(function(st){
+    entregas.forEach(function(e){aeCmtRefresh(st.id,e.id,true);});
+    aeCmtMarker(st.id);
+  });
 }
 
 // Scroll al estudiante por letra del índice
@@ -10934,97 +10944,149 @@ function toggleAeEntCmt(stuId){
 }
 
 // Toggle modo pts/nota para entregas
+let _aeSavedFlag=false;
+
+// Modo efectivo de una celda: entrega fija en nota > modo guardado con el valor > interruptor global
+function _aeEntMode(e,v){
+  if(e&&e.modoNota)return true;
+  if(v&&typeof v==='object'&&v.modoNota!==undefined)return !!v.modoNota;
+  return !!_aeModoNota;
+}
+
+// Toggle modo pts/nota para entregas (conversión por celda; inversa correcta de calcNota)
 function toggleAeEntregasModo(){
   const data=getGrD(_ae.cId,_ae.asig,_ae.per);
   const act=(data.activities||[]).find(function(a){return a.id===_ae.actId;});
   if(!act)return;
+  const prevGlobal=_aeModoNota;
   _aeModoNota=!_aeModoNota;
-  // Convertir valores del buffer entre modos (igual que actividades normales)
   Object.keys(_aeBuf).forEach(function(stuId){
     const ents=(_aeBuf[stuId]||{}).entregas||{};
     act.entregas.forEach(function(e){
       if(e.modoNota)return; // entregas fijas en nota no se convierten
       const v=ents[e.id];
-      const rawObt=v&&typeof v==='object'?v.obt:v;
+      const isObj=v&&typeof v==='object';
+      const rawObt=isObj?v.obt:v;
       if(rawObt===''||rawObt===undefined||rawObt===null)return;
       const numObt=Number(rawObt);
       if(isNaN(numObt))return;
+      const pos=e.posibles||1;
+      const curNota=(isObj&&v.modoNota!==undefined)?!!v.modoNota:prevGlobal;
+      if(curNota===_aeModoNota){ // ya está en el modo destino: solo se etiqueta
+        if(isObj)v.modoNota=_aeModoNota;
+        return;
+      }
       let newObt;
-      if(_aeModoNota){
-        newObt=calcNota(numObt,e.posibles||1); // pts → nota
-      } else {
-        const pos=e.posibles||1;
-        newObt=Math.round(((numObt-3)/2*pos)*10)/10;
-        newObt=Math.max(0,Math.min(pos,newObt)); // nota → pts
+      if(_aeModoNota){ // pts → nota
+        newObt=calcNota(numObt,pos);
+        if(newObt===null)return;
+        if(isObj){v._p=numObt;}else{ents[e.id]={obt:newObt,modoNota:true,_p:numObt};return;}
+      } else { // nota → pts
+        if(isObj&&v._p!==undefined&&calcNota(v._p,pos)===numObt){newObt=v._p;} // sin editar: recupera los pts originales
+        else{newObt=Math.min(pos,aeNota2Obt(numObt,pos));}
+        if(isObj)delete v._p;
       }
-      if(newObt===null||isNaN(newObt))return;
-      if(v&&typeof v==='object'){
-        v.obt=newObt;v.modoNota=_aeModoNota;
-      } else {
-        ents[e.id]={obt:newObt,modoNota:_aeModoNota};
-      }
+      if(isObj){v.obt=newObt;v.modoNota=_aeModoNota;}
+      else{ents[e.id]={obt:newObt,modoNota:_aeModoNota};}
     });
   });
   renderAeEntregas(act,data,getStuDs(_ae.cId,_ae.per),_ae.cId,_ae.asig,_ae.per);
 }
 
-// Input de comentario por entrega
+// ── Comentarios por entrega: estado SIEMPRE visible (guardado / sin guardar) ──
+function _aeSavedCmt(stuId,eId){
+  const data=getGrD(_ae.cId,_ae.asig,_ae.per);
+  const s=((data.scores||{})[stuId]||{})[_ae.actId]||{};
+  const en=(s.entregas||{})[eId];
+  return en&&en.comment?String(en.comment):'';
+}
+function _aeBufCmt(stuId,eId){ // comentario vigente: el del buffer si existe (aunque esté vacío); si no, el guardado
+  const en=((_aeBuf[stuId]||{}).entregas||{})[eId];
+  if(en&&typeof en==='object'&&typeof en.comment==='string')return en.comment;
+  return _aeSavedCmt(stuId,eId);
+}
+const _AE_BTN='cursor:pointer;font-size:11px;padding:3px 7px;border-radius:var(--rs);font-weight:600;line-height:1;white-space:nowrap;border:1px solid ';
+function aeCmtRefresh(stuId,eId,skipMarker){
+  const bc=_aeBufCmt(stuId,eId),sc=_aeSavedCmt(stuId,eId);
+  const st=bc!==sc?'dirty':(sc?'saved':'empty');
+  const btn=document.getElementById('ae-ecmt-btn-'+stuId+'-'+eId);
+  if(btn){
+    if(st==='dirty'){
+      btn.textContent='💾 Guardar';
+      btn.style.cssText=_AE_BTN+'#F59E0B;background:var(--ac);color:#fff;box-shadow:0 0 0 2px rgba(245,158,11,.4);';
+      btn.title=bc?'Hay cambios sin guardar en este comentario':'El comentario se eliminará al guardar';
+    } else if(st==='saved'){
+      btn.textContent='✓ Guardado';
+      btn.style.cssText=_AE_BTN+'var(--ok,#16A34A);background:transparent;color:var(--ok,#16A34A);';
+      btn.title='Comentario guardado';
+    } else {
+      btn.textContent='💾 Guardar';
+      btn.style.cssText=_AE_BTN+'var(--br);background:var(--sf2);color:var(--ink3);';
+      btn.title='Escribe un comentario para guardarlo';
+    }
+  }
+  const stEl=document.getElementById('ae-ecmt-st-'+stuId+'-'+eId);
+  if(stEl){
+    stEl.textContent=st==='dirty'?(bc?'● sin guardar':'● se eliminará al guardar'):'';
+  }
+  const del=document.getElementById('ae-ecmt-del-'+stuId+'-'+eId);
+  if(del)del.style.display=(bc||sc)?'':'none';
+  if(!skipMarker)aeCmtMarker(stuId);
+}
+function aeCmtMarker(stuId){
+  const mk=document.getElementById('ae-cmt-mk-'+stuId);if(!mk)return;
+  const data=getGrD(_ae.cId,_ae.asig,_ae.per);
+  const act=(data.activities||[]).find(function(a){return a.id===_ae.actId;});
+  if(!act)return;
+  let dirty=false,has=false;
+  (act.entregas||[]).forEach(function(e){
+    const bc=_aeBufCmt(stuId,e.id),sc=_aeSavedCmt(stuId,e.id);
+    if(bc!==sc)dirty=true;
+    if(bc||sc)has=true;
+  });
+  mk.innerHTML='<span style="'+(has?'':'opacity:.35')+'">💬</span>'+(dirty?' <span title="Comentarios sin guardar" style="color:#F59E0B">●</span>':'');
+}
+
 function aeDelEntregaCmt(btn){
   const stuId=btn.dataset.sid;
   const eId=btn.dataset.eid;
-  // Limpiar el input
   const inp=document.getElementById('ae-ecmt-'+stuId+'-'+eId);
-  if(inp)inp.value='';
-  // Limpiar en el buffer
-  if(_aeBuf[stuId]?.entregas?.[eId]?.comment!==undefined){
-    _aeBuf[stuId].entregas[eId].comment='';
-  }
-  // Ocultar el botón ✕
-  btn.style.display='none';
+  if(inp){inp.value='';aeEntregaCmt(inp);} // vacía el buffer (queda "se eliminará al guardar")
 }
 
-
-function saveEntregaCmt(stuId, eId){
-  const inp=document.getElementById('ae-ecmt-'+stuId+'-'+eId);
-  if(!inp)return;
-  // Actualizar buffer con el valor actual del textarea
-  aeEntregaCmt(inp);
-  // Guardar en data.scores de inmediato
-  const{actId,cId,asig,per}=_ae;
-  const data=getGrD(cId,asig,per);
+// Guarda en data.scores UNA entrega de un estudiante a partir del buffer (compartido por ambos botones Guardar)
+function _aeCommitEntrega(data,actId,stuId,eId){
   if(!data.scores)data.scores={};
   if(!data.scores[stuId])data.scores[stuId]={};
   if(!data.scores[stuId][actId])data.scores[stuId][actId]={};
   if(!data.scores[stuId][actId].entregas)data.scores[stuId][actId].entregas={};
-  const buf=(_aeBuf[stuId]||{}).entregas||{};
-  const v=buf[eId];
+  const ents=data.scores[stuId][actId].entregas;
+  const v=((_aeBuf[stuId]||{}).entregas||{})[eId];
   const isObj=v&&typeof v==='object';
-  const comment=isObj&&v.comment?v.comment:'';
   const obt=isObj?v.obt:v;
+  const comment=isObj&&v.comment?v.comment:'';
   const hasObt=obt!==''&&obt!==undefined&&obt!==null;
-  const prev=data.scores[stuId][actId].entregas[eId]||{};
-  if(!hasObt&&!comment){
-    delete data.scores[stuId][actId].entregas[eId];
-  } else {
-    const entry={...prev,...(hasObt?{obt:Number(obt)}:{})};
-    if(comment){entry.comment=comment;}else{delete entry.comment;}
-    data.scores[stuId][actId].entregas[eId]=entry;
-  }
-  save();
-  // Feedback visual en el botón
-  const btns=inp.parentElement?.querySelectorAll('button');
-  const saveBtn=[...btns||[]].find(b=>b.textContent.includes('Guardar'));
-  if(saveBtn){
-    const orig=saveBtn.textContent;
-    saveBtn.textContent='✅';
-    saveBtn.style.background='var(--ok,#22C55E)';
-    setTimeout(function(){saveBtn.textContent=orig;saveBtn.style.background='var(--ac)';},1200);
-  }
-  // Mostrar/ocultar botón ✕ según si hay comentario
-  const delBtn=[...btns||[]].find(b=>b.textContent==='✕');
-  if(delBtn)delBtn.style.display=comment?'':'none';
+  if(!hasObt&&!comment){delete ents[eId];return;}
+  const entry={...(ents[eId]||{})};
+  if(hasObt){entry.obt=Number(obt);}else{delete entry.obt;}
+  if(comment){entry.comment=comment;}else{delete entry.comment;}
+  // Guardar modoNota efectivo para recalcular correctamente
+  const vModo=isObj&&v.modoNota!==undefined?v.modoNota:undefined;
+  if(vModo!==undefined&&hasObt){entry.modoNota=vModo;}else{delete entry.modoNota;}
+  ents[eId]=entry;
 }
 
+function saveEntregaCmt(stuId, eId){
+  const inp=document.getElementById('ae-ecmt-'+stuId+'-'+eId);
+  if(!inp)return;
+  aeEntregaCmt(inp); // sincroniza el buffer con el texto actual
+  const{actId,cId,asig,per}=_ae;
+  const data=getGrD(cId,asig,per);
+  _aeCommitEntrega(data,actId,stuId,eId);
+  save();markGrDirty();renderGrades();
+  aeCmtRefresh(stuId,eId);
+  _aeSaveBtnRefresh();
+}
 
 function aeEntregaCmt(inp){
   const stuId=inp.dataset.sid;
@@ -11037,8 +11099,50 @@ function aeEntregaCmt(inp){
     _aeBuf[stuId].entregas[eId]={obt:_aeBuf[stuId].entregas[eId]||''};
   }
   _aeBuf[stuId].entregas[eId].comment=txt;
+  aeCmtRefresh(stuId,eId);
+  _aeSaveBtnRefresh();
 }
 
+// ¿Hay cambios de entregas sin guardar? (compara buffer vs guardado: puntos, comentario, modo)
+function _aeEntregasPending(){
+  try{
+    if(!_ae||!_ae.actId||!_aeBuf)return false;
+    const data=getGrD(_ae.cId,_ae.asig,_ae.per);
+    const act=(data.activities||[]).find(function(a){return a.id===_ae.actId;});
+    if(!act||act.actType!=='entregas')return false;
+    const n=function(v){return(v===undefined||v===null||v==='')?'':String(Number(v));};
+    return Object.keys(_aeBuf).some(function(stuId){
+      const bEnts=(_aeBuf[stuId]||{}).entregas||{};
+      const sEnts=((((data.scores||{})[stuId])||{})[_ae.actId]||{}).entregas||{};
+      const ids=Object.keys(bEnts).concat(Object.keys(sEnts));
+      for(let i=0;i<ids.length;i++){
+        const id=ids[i],bv=bEnts[id],sv=sEnts[id];
+        const bo=bv&&typeof bv==='object'?bv.obt:bv;
+        const so=sv?sv.obt:undefined;
+        if(n(bo)!==n(so))return true;
+        const bc=(bv&&typeof bv==='object'&&bv.comment)||'';
+        const sc=(sv&&sv.comment)||'';
+        if(bc!==sc)return true;
+        if(n(bo)!==''&&bv&&typeof bv==='object'&&bv.modoNota!==undefined&&sv&&sv.modoNota!==undefined&&!!bv.modoNota!==!!sv.modoNota)return true;
+      }
+      return false;
+    });
+  }catch(e){return false;}
+}
+
+// Botón Guardar del encabezado: muestra el estado real
+function _aeSaveBtnRefresh(){
+  const bt=document.getElementById('ae-save-btn');if(!bt)return;
+  if(_aeEntregasPending()){
+    _aeSavedFlag=false;
+    bt.innerHTML='💾 Guardar <span style="color:#FBBF24">●</span>';
+    bt.title='Hay cambios sin guardar';
+  } else if(_aeSavedFlag){
+    bt.textContent='✓ Guardado';bt.title='Todo guardado';
+  } else {
+    bt.textContent='💾 Guardar';bt.title='Guardar';
+  }
+}
 
 function aeEntregaInput(inp){
   const stuId=inp.dataset.sid;
@@ -11053,6 +11157,7 @@ function aeEntregaInput(inp){
   const prevComment=prevEnt&&typeof prevEnt==='object'?(prevEnt.comment||''):'';
   // Guardar obt + comment + modoNota efectivo para calcular correctamente
   _aeBuf[stuId].entregas[entregaId]={obt:val===''?'':Number(val),comment:prevComment,modoNota:modoNota};
+  _aeSaveBtnRefresh();
   const nota=val===''?null:(modoNota?Number(val):calcNota(Number(val),posibles));
   // Recalcular nota final del estudiante
   const data=getGrD(_ae.cId,_ae.asig,_ae.per);
@@ -11065,7 +11170,7 @@ function aeEntregaInput(inp){
     const raw=entBuf[e.id];
     const obt=raw&&raw.obt!==''&&raw.obt!==undefined?raw.obt:(entScores[e.id]?.obt??'');
     if(obt===''||obt===undefined)return;
-    const efectiveModo=_aeModoNota||(!!e.modoNota);
+    const efectiveModo=_aeEntMode(e,raw);
     const n=efectiveModo?Number(obt):calcNota(Number(obt),e.posibles||1);
     if(n===null)return;
     pesoCalif+=e.peso;notaSum+=n*e.peso;
@@ -11493,38 +11598,22 @@ saveActEntry=function(){
   const data=getGrD(_ae.cId,_ae.asig,_ae.per);
   const act=(data.activities||[]).find(function(a){return a.id===_ae.actId;});
   if(act&&act.actType==='entregas'){
+    if(!_aeEntregasPending()){toast('Sin cambios nuevos que guardar','s');return;}
     pushUndo('Calificar entregas — '+esc(act.name));
-    if(!data.scores)data.scores={};
     getStuDs(_ae.cId,_ae.per).forEach(function(st){
-      const buf=_aeBuf[st.id]||{};
-      const entBuf=buf.entregas||{};
-      if(!Object.keys(entBuf).length)return;
-      if(!data.scores[st.id])data.scores[st.id]={};
-      if(!data.scores[st.id][act.id])data.scores[st.id][act.id]={};
-      if(!data.scores[st.id][act.id].entregas)data.scores[st.id][act.id].entregas={};
-      Object.keys(entBuf).forEach(function(eId){
-        const v=entBuf[eId];
-        const isObj=v&&typeof v==='object';
-        const obt=isObj?v.obt:v;
-        const comment=isObj&&v.comment?v.comment:'';
-        const hasObt=obt!==''&&obt!==undefined&&obt!==null;
-        if(!hasObt&&!comment){
-          delete data.scores[st.id][act.id].entregas[eId];
-        } else {
-          const prev=data.scores[st.id][act.id].entregas[eId]||{};
-          const entry={...prev,...(hasObt?{obt:Number(obt)}:{})};
-          // Manejar comment explícitamente para no conservar valores viejos
-          if(comment){entry.comment=comment;}else{delete entry.comment;}
-          // Guardar modoNota efectivo para recalcular correctamente
-          const vModo=isObj&&v.modoNota!==undefined?v.modoNota:undefined;
-          if(vModo!==undefined){entry.modoNota=vModo;}else{delete entry.modoNota;}
-          data.scores[st.id][act.id].entregas[eId]=entry;
-        }
-      });
+      const entBuf=(_aeBuf[st.id]||{}).entregas||{};
+      Object.keys(entBuf).forEach(function(eId){_aeCommitEntrega(data,act.id,st.id,eId);});
     });
     save();markGrDirty();renderGrades();
+    // Igual que las demás actividades: la ventana sigue abierta y el buffer se alinea con lo guardado
+    getStuDs(_ae.cId,_ae.per).forEach(function(st){
+      const sc=((data.scores||{})[st.id]||{})[act.id]||{};
+      if(!_aeBuf[st.id])_aeBuf[st.id]={obt:'',pos:'',posFixed:false,comments:[],entregas:{}};
+      _aeBuf[st.id].entregas=sc.entregas?JSON.parse(JSON.stringify(sc.entregas)):{};
+    });
+    _aeSavedFlag=true;
+    renderAeList();
     toast('Entregas guardadas ✅','s');
-    closeActEntry();
     return;
   }
   _saveActEntryOrig();
