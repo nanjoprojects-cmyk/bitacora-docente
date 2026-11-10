@@ -2598,6 +2598,7 @@ function _refreshOpenOverlaysAfterUndo(){
         _pxcBuf[st.id]=sc.resp?JSON.parse(JSON.stringify(sc.resp)):{};
       }
     });
+    _pxcDirty=false;
     renderPxcList&&renderPxcList();
   }
 }
@@ -11875,6 +11876,28 @@ function pxcMarkAll(correct){
   });
   renderPxcList();
 }
+// ── PxC: helpers de guardado selectivo ──
+function pxcNormResp(r){
+  // Normaliza respuestas (formato nuevo objeto, legado arreglo) a {qId:lbl} solo con valores no vacíos
+  const out={};
+  if(!r)return out;
+  if(Array.isArray(r)){r.forEach(function(id){out[String(id)]='A';});return out;}
+  Object.keys(r).forEach(function(k){if(r[k])out[k]=r[k];});
+  return out;
+}
+function pxcRespEqual(a,b){
+  const ka=Object.keys(a),kb=Object.keys(b);
+  if(ka.length!==kb.length)return false;
+  return ka.every(function(k){return a[k]===b[k];});
+}
+function pxcCalcObt(preguntas,resp){
+  return preguntas.reduce(function(s,p){
+    const sel=resp[String(p.id)];
+    if(!sel)return s;
+    const opt=p.opts.find(function(o){return o.lbl===sel;});
+    return s+(opt?opt.pts:0);
+  },0);
+}
 function savePxcGrades(){
   const{cId,asig,per}=_pxc;
   const data=getGrD(cId,asig,per);
@@ -11882,9 +11905,34 @@ function savePxcGrades(){
   if(!cfg)return;
   const preguntas=cfg.preguntas.map(pxcMigrateQuestion);
   const studs=getStuDs(cId,per);
+  const EPS=1e-9;
+
+  // Clasificar estudiantes: solo se tocan los que realmente lo necesitan
+  //  - changed: el docente modificó sus respuestas en esta sesión
+  //  - stale:   respuestas intactas, pero la configuración cambió y su obt guardado quedó desactualizado
+  const work=[];
+  studs.forEach(function(st){
+    const sc=(data.scores[st.id]||{})._pxc;
+    const stored=pxcNormResp(sc&&sc.resp);
+    const cur=pxcNormResp(_pxcBuf[st.id]);
+    if(!pxcRespEqual(stored,cur)){work.push({st:st,cur:cur,kind:'changed'});return;}
+    if(sc&&Object.keys(stored).length){
+      const fresh=pxcCalcObt(preguntas,stored);
+      if(Math.abs(fresh-(sc.obt||0))>EPS||Math.abs((sc.pos||0)-cfg.total)>EPS){
+        work.push({st:st,cur:stored,kind:'stale',oldObt:sc.obt});
+      }
+    }
+  });
+
+  if(!work.length){
+    _pxcDirty=false;
+    toast('No hay cambios que guardar en la calificación PxC','s');
+    return;
+  }
+
   pushUndo('Guardar notas PxC');
   const PXC_ACT_NAME='Prueba por Competencias (PxC)';
-  let act=data.activities.find(a=>a.pilar==='pxc'&&a.pxcAuto);
+  let act=data.activities.find(function(a){return a.pilar==='pxc'&&a.pxcAuto;});
   if(!act){
     act={id:uid(),name:PXC_ACT_NAME,pilar:'pxc',posibles:cfg.total,
       desc:'Nota calculada automáticamente desde las respuestas de la Prueba por Competencias.',
@@ -11893,31 +11941,44 @@ function savePxcGrades(){
   } else {
     act.posibles=cfg.total;
   }
-  studs.forEach(st=>{
-    const resp=_pxcBuf[st.id]||{};
-    const hasResp=Object.values(resp).some(v=>v&&v!=='');
-    const obt=preguntas.reduce((s,p)=>{
-      const sel=resp[String(p.id)];
-      if(!sel)return s;
-      const opt=p.opts.find(o=>o.lbl===sel);
-      return s+(opt?opt.pts:0);
-    },0);
+
+  let nChanged=0;
+  work.forEach(function(w){
+    const st=w.st,resp=w.cur;
+    const hasResp=Object.keys(resp).length>0;
+    const obt=pxcCalcObt(preguntas,resp);
     if(!data.scores[st.id])data.scores[st.id]={};
-    if(hasResp){
-      // Tiene respuestas → guardar score
+    const prev=data.scores[st.id][act.id]||{};
+    if(w.kind==='stale'){
+      // Solo cambió la configuración: refrescar lo calculado, pero NO pisar una nota fijada a mano
+      const wasManual=prev.obt!==undefined&&prev.obt!==''&&Math.abs(Number(prev.obt)-(w.oldObt||0))>EPS;
       data.scores[st.id]._pxc={resp:{...resp},obt,pos:cfg.total};
-      const prev=data.scores[st.id][act.id]||{};
+      if(!wasManual){
+        const posToUse=prev.posFixed?prev.pos:cfg.total;
+        data.scores[st.id][act.id]={...prev,obt,pos:posToUse,...(prev.posFixed?{posFixed:true}:{})};
+      }
+      return;
+    }
+    nChanged++;
+    if(hasResp){
+      data.scores[st.id]._pxc={resp:{...resp},obt,pos:cfg.total};
       const posToUse=prev.posFixed?prev.pos:cfg.total;
       data.scores[st.id][act.id]={...prev,obt,pos:posToUse,...(prev.posFixed?{posFixed:true}:{})};
     } else {
-      // Sin respuestas → borrar score para que la planilla muestre —
+      // Se borraron todas las respuestas → quitar score para que la planilla muestre —
       delete data.scores[st.id]._pxc;
       delete data.scores[st.id][act.id];
     }
   });
   save();markGrDirty();
+  _pxcDirty=false;
   renderGrades();
-  toast('Notas PxC guardadas - '+studs.length+' estudiantes','s');
+  const nStale=work.length-nChanged;
+  if(!nChanged){
+    toast('Notas PxC recalculadas por el cambio de configuración ('+nStale+' estudiante'+(nStale===1?'':'s')+')','s');
+  } else {
+    toast('Notas PxC guardadas — '+nChanged+' estudiante'+(nChanged===1?'':'s')+' actualizado'+(nChanged===1?'':'s')+(nStale?' (+'+nStale+' por cambio de configuración)':''),'s');
+  }
 }
 
 function promptLoadAttAsSER(){
