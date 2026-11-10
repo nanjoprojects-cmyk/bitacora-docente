@@ -57,6 +57,7 @@ body{font-family:'Epilogue',sans-serif;background:var(--bg);color:var(--ink);min
 .tb-btn:disabled:hover{background:rgba(255,255,255,.08);}
 /* Indicador de guardado / sincronización */
 .tb-save{position:relative;min-width:34px;justify-content:center;padding:5px 9px;}
+input.exceso{border-color:#D97706!important;background:rgba(217,119,6,.14)!important;}
 .tb-save .ss-dot{position:absolute;top:2px;right:2px;width:9px;height:9px;border-radius:50%;border:2px solid var(--ink);background:#9CA3AF;box-sizing:content-box;}
 .tb-save[data-s="ok"] .ss-dot{background:#22C55E;}
 .tb-save[data-s="sync"] .ss-dot{background:#60A5FA;animation:ssPulse 1s ease-in-out infinite;}
@@ -2032,12 +2033,12 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
 <!-- CONFIRM -->
 <div class="conf-ov" id="conf">
   <div class="conf-box">
-    <div style="font-size:34px;margin-bottom:9px">🗑</div>
-    <div style="font-size:15px;font-weight:700;margin-bottom:5px">¿Eliminar?</div>
+    <div style="font-size:34px;margin-bottom:9px" id="conf-icon">🗑</div>
+    <div style="font-size:15px;font-weight:700;margin-bottom:5px" id="conf-title">¿Eliminar?</div>
     <div style="font-size:13px;color:var(--ink3);margin-bottom:18px" id="conf-msg">Esta acción no se puede deshacer.</div>
     <div style="display:flex;gap:8px;justify-content:center">
       <button class="btn" onclick="closeConf()">Cancelar</button>
-      <button class="btn danger" onclick="doConf()">Sí, eliminar</button>
+      <button class="btn danger" id="conf-ok" onclick="doConf()">Sí, eliminar</button>
     </div>
   </div>
 </div>
@@ -2660,9 +2661,55 @@ function calcNotaBanco(pts,maxPts){
   if(pts===''||pts===null||pts===undefined||maxPts===''||maxPts===null||Number(maxPts)<=0)return 3.0;
   return Math.min(5,Math.max(1,Math.round((3+(Number(pts)/Number(maxPts))*2)*10)/10));
 }
-function calcNota(obt,pos){
+function calcNota(obt,pos,raw){
   if(obt===''||obt===null||obt===undefined||pos===''||pos===null||pos===undefined||Number(pos)<=0)return null;
-  return Math.round((Number(obt)/Number(pos)*4+1)*10)/10;
+  const n=Math.round((Number(obt)/Number(pos)*4+1)*10)/10;
+  // Tope de la escala: ninguna actividad vale menos de 1.0 ni más de 5.0 (raw=true devuelve el valor sin tope)
+  return raw?n:Math.min(5,Math.max(1,n));
+}
+// Nota ingresada directamente (modo nota): también se limita a 1.0–5.0
+function clampNota(v){
+  const n=Number(v);
+  if(v===''||v===null||v===undefined||!isFinite(n))return null;
+  return Math.min(5,Math.max(1,n));
+}
+// Texto de advertencia si el valor se sale de lo posible ('' si está bien).
+// modoNota=true: v es una nota (1–5); si no, v son puntos y pos los posibles.
+function _exceso(v,pos,modoNota){
+  if(v===''||v===null||v===undefined)return '';
+  const n=Number(v);
+  if(!isFinite(n))return '';
+  if(modoNota){
+    if(n>5)return 'nota '+n+' supera 5.0';
+    if(n<1)return 'nota '+n+' es menor que 1.0';
+    return '';
+  }
+  const p=Number(pos);
+  if(!(p>0))return '';
+  if(n>p)return n+' pts > '+p+' posibles';
+  if(n<0)return n+' pts (negativo)';
+  return '';
+}
+// Diálogo de confirmación para valores fuera de rango (reutiliza #conf)
+function _confirmExceso(items,onOk){
+  const max=6;
+  const lines=items.slice(0,max).map(function(t){return '\u2022 '+t;});
+  if(items.length>max)lines.push('\u2026 y '+(items.length-max)+' m\u00e1s');
+  const msg=document.getElementById('conf-msg');
+  msg.textContent='Hay valores fuera de lo posible:\n'+lines.join('\n')+
+    '\n\nLa nota de cada actividad se limita a 1.0\u20135.0, as\u00ed que el exceso no sube la definitiva. \u00bfGuardar as\u00ed?';
+  msg.style.whiteSpace='pre-line';msg.style.textAlign='left';
+  const t=document.getElementById('conf-title');if(t)t.textContent='Revisa los valores';
+  const ic=document.getElementById('conf-icon');if(ic)ic.textContent='\u26a0\ufe0f';
+  const ok=document.getElementById('conf-ok');if(ok){ok.textContent='S\u00ed, es correcto';ok.className='btn primary';}
+  confCb=onOk;
+  document.getElementById('conf').classList.add('open');
+}
+function _confReset(){
+  const msg=document.getElementById('conf-msg');if(msg){msg.style.whiteSpace='';msg.style.textAlign='';}
+  const t=document.getElementById('conf-title');if(t)t.textContent='\u00bfEliminar?';
+  const ic=document.getElementById('conf-icon');if(ic)ic.textContent='\ud83d\uddd1';
+  const ok=document.getElementById('conf-ok');if(ok){ok.textContent='S\u00ed, eliminar';ok.className='btn danger';}
 }
 function notaCls(n){if(n===null||n===undefined)return'em';if(n>=4.5)return'hi';if(n>=3.5)return'mi';if(n>=3.0)return'lo';return'fa';}
 function attStats(rec,dates){
@@ -4269,10 +4316,13 @@ function calcUpdate(){
   const el=document.getElementById('calc-res');if(!el)return;
   if(nota===null){el.innerHTML='';return;}
   const pct=Math.round(Number(obt)/Number(pos)*100);
+  const _rawN=calcNota(obt,pos,true);
+  const _lim=_rawN>5?'Superas los puntos posibles: la nota se limita a 5.0':(_rawN<1?'Valor negativo: la nota m\u00ednima es 1.0':'');
   const nivel=nota>=4.6?'Desempeño Superior (DS)':nota>=4.0?'Desempeño Alto (DA)':nota>=3.0?'Desempeño Básico (DB)':'Desempeño Bajo (DBj)';
   el.innerHTML='<div style="background:linear-gradient(135deg,var(--ac),#1A3A8F);color:#fff;border-radius:var(--r);padding:18px;text-align:center">'+
     '<div style="font-family:\'Libre Baskerville\',serif;font-size:46px;font-weight:700">'+nota.toFixed(1)+'</div>'+
     '<div style="font-size:14px;opacity:.9;margin-top:3px">'+nivel+'</div>'+
+    (_lim?'<div style="font-size:12px;margin-top:8px;background:rgba(255,255,255,.18);border-radius:6px;padding:4px 8px">\u26a0 '+_lim+'</div>':'')+
     '<div style="font-size:11px;opacity:.6;margin-top:6px;font-family:monospace">('+obt+' ÷ '+pos+') × 4 + 1 = '+nota.toFixed(1)+' · '+pct+'% de puntos</div>'+
   '</div>';
 }
@@ -5129,7 +5179,7 @@ function confDelEst(id,cId,per){
 }
 
 // CONFIRM
-function closeConf(){document.getElementById('conf').classList.remove('open');confCb=null;}
+function closeConf(){document.getElementById('conf').classList.remove('open');confCb=null;_confReset();}
 function doConf(){if(confCb)confCb();closeConf();}
 
 // ══════════════════════════
@@ -8116,7 +8166,7 @@ function calcEntregasNota(act, stuId, data){
     if(!sc||sc.obt===''||sc.obt===undefined||sc.obt===null)return;
     // Usar modoNota guardado con el score, si existe; si no, el del diseño de la entrega
     const efectivoModo=sc.modoNota!==undefined?sc.modoNota:(!!e.modoNota);
-    const nota=efectivoModo?Number(sc.obt):calcNota(Number(sc.obt),e.posibles||1);
+    const nota=efectivoModo?clampNota(sc.obt):calcNota(Number(sc.obt),e.posibles||1);
     if(nota===null)return;
     pesoTotal+=e.peso;
     notaSum+=nota*e.peso;
@@ -10605,6 +10655,10 @@ function saveRecovery(){
   const data=getGrD(cId,asig,per);
   const act=data.activities.find(a=>a.id===actId);
   const pos=act?.posibles||obt;
+  if(!_recovery._ok){
+    const _t=_exceso(obt,pos,false);
+    if(_t){_confirmExceso([actName+': '+_t],function(){_recovery._ok=true;saveRecovery();});return;}
+  }
   if(!data.scores[stuId])data.scores[stuId]={};
   if(!data.scores[stuId][actId])data.scores[stuId][actId]={};
   pushUndo('Nota de recuperación — '+actName);
@@ -10827,7 +10881,7 @@ function renderAeEntregas(act, data, studs, cId, asig, per){
         (savObj&&savObj.obt!==undefined&&savObj.obt!==''?savObj.obt:undefined);
       if(obt===undefined||obt===null||obt==='')return;
       const useNota=_aeEntMode(e,(bufObj!==undefined&&bufObj!==''&&bufObj!==null)?bufObj:savObj);
-      const n=useNota?Number(obt):calcNota(Number(obt),e.posibles||1);
+      const n=useNota?clampNota(obt):calcNota(Number(obt),e.posibles||1);
       if(n===null)return;
       pesoCalif+=e.peso;notaSum+=n*e.peso;
     });
@@ -10840,7 +10894,7 @@ function renderAeEntregas(act, data, studs, cId, asig, per){
         String(typeof bufObj==='object'?bufObj.obt:bufObj):
         (savObj&&savObj.obt!==undefined&&savObj.obt!==''?String(savObj.obt):'');
       const useNota=_aeEntMode(e,(bufObj!==undefined&&bufObj!==''&&bufObj!==null)?bufObj:savObj);
-      const nota=curObt!==''?(useNota?Number(curObt):calcNota(Number(curObt),e.posibles||1)):null;
+      const nota=curObt!==''?(useNota?clampNota(curObt):calcNota(Number(curObt),e.posibles||1)):null;
       cells+='<td style="padding:3px 4px;border:1px solid var(--br);text-align:center;background:'+rowBg+'">'+
         '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'+
         '<input type="number" min="'+(useNota?'1':'0')+'" '+(useNota?'max="5" ':'')+
@@ -11158,7 +11212,8 @@ function aeEntregaInput(inp){
   // Guardar obt + comment + modoNota efectivo para calcular correctamente
   _aeBuf[stuId].entregas[entregaId]={obt:val===''?'':Number(val),comment:prevComment,modoNota:modoNota};
   _aeSaveBtnRefresh();
-  const nota=val===''?null:(modoNota?Number(val):calcNota(Number(val),posibles));
+  {const _t=_exceso(val,posibles,modoNota);inp.classList.toggle('exceso',!!_t);inp.title=_t?('\u26a0 '+_t+' \u2014 la nota se limitar\u00e1 a 5.0 (m\u00edn. 1.0)'):'';}
+  const nota=val===''?null:(modoNota?clampNota(val):calcNota(Number(val),posibles));
   // Recalcular nota final del estudiante
   const data=getGrD(_ae.cId,_ae.asig,_ae.per);
   const act=(data.activities||[]).find(function(a){return a.id===actId;});
@@ -11171,7 +11226,7 @@ function aeEntregaInput(inp){
     const obt=raw&&raw.obt!==''&&raw.obt!==undefined?raw.obt:(entScores[e.id]?.obt??'');
     if(obt===''||obt===undefined)return;
     const efectiveModo=_aeEntMode(e,raw);
-    const n=efectiveModo?Number(obt):calcNota(Number(obt),e.posibles||1);
+    const n=efectiveModo?clampNota(obt):calcNota(Number(obt),e.posibles||1);
     if(n===null)return;
     pesoCalif+=e.peso;notaSum+=n*e.peso;
   });
@@ -11234,7 +11289,7 @@ function renderAeList(){
       </div>`:`
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <label style="font-size:11px;color:var(--ink3)">${_aeModoNota?'Nota:':'Obt:'}</label>
-        <input class="ae-obt pi" type="number" min="${_aeModoNota?1:0}" max="${_aeModoNota?5:''}" step="${_aeModoNota?0.1:0.5}" autocomplete="off"
+        <input class="ae-obt pi${(!isBanco&&_exceso(buf.obt,posEff,false))?' exceso':''}" type="number" min="${_aeModoNota?1:0}" max="${_aeModoNota?5:''}" step="${_aeModoNota?0.1:0.5}" autocomplete="off"
           value="${_aeModoNota?(buf.obt!==''&&posEff!==''?aeObt2Nota(buf.obt,posEff)||'':''):buf.obt}" placeholder="${_aeModoNota?'1.0':'0'}"
           style="width:70px;font-size:14px;font-weight:700;text-align:center;cursor:pointer;${_aeModoNota?'border-color:var(--ac);background:var(--acl);':''}"
           readonly onclick="this.removeAttribute('readonly');this.focus();this.select();"
@@ -11255,7 +11310,7 @@ function renderAeList(){
         <span style="font-size:11px;color:var(--ink3);min-width:18px">${i+1}</span>
         <span style="flex:1;font-size:13px;font-weight:600;color:var(--ink)">${esc(st.nombre)}</span>
         ${cmts.length?`<span style="font-size:10px;color:var(--ac);font-weight:700">💬 ${cmts.length}</span>`:''}
-        <span id="ae-nota-${st.id}" class="pn ${nota!==null?notaCls(nota):(isBanco?'lo':'em')}" style="font-size:14px">${nota!==null?nota.toFixed(1):'—'}</span>
+        <span id="ae-nota-${st.id}" class="pn ${nota!==null?notaCls(nota):(isBanco?'lo':'em')}" style="font-size:14px">${nota!==null?nota.toFixed(1):'—'}${(!isBanco&&_exceso(buf.obt,posEff,false))?' \u26a0':''}</span>
       </div>
       ${inputArea}
       <div style="display:flex;gap:5px;align-items:center;margin-top:6px">
@@ -11287,7 +11342,7 @@ function aeUpdate(stuId,val){
   const data=getGrD(_ae.cId,_ae.asig,_ae.per);
   const act=data.activities.find(a=>a.id===_ae.actId)||{};
   const isBanco=act.actType==='banco';
-  let nota=null;
+  let nota=null;let _exTxt='';
   if(isBanco){
     nota=calcNotaBanco(val===''?0:parseFloat(val),act.maxPtsBanco||10);
   } else {
@@ -11295,9 +11350,48 @@ function aeUpdate(stuId,val){
     const pos=(_aeBuf[stuId].posFixed&&_aeBuf[stuId].pos!=='')?_aeBuf[stuId].pos
               :(parseFloat(document.getElementById('ae-pos')?.value)||act.posibles||'');
     nota=val!==''&&pos!==''?calcNota(val,pos):null;
+    _exTxt=_exceso(_aeBuf[stuId].obt,pos,false);
   }
   const el=document.getElementById('ae-nota-'+stuId);
-  if(el){el.textContent=nota!==null?nota.toFixed(1):'—';el.className='pn '+(nota!==null?notaCls(nota):(isBanco?'lo':'em'));}
+  if(el){el.textContent=(nota!==null?nota.toFixed(1):'—')+(_exTxt?' \u26a0':'');el.title=_exTxt?'La nota se limita a 5.0 (m\u00edn. 1.0)':'';el.className='pn '+(nota!==null?notaCls(nota):(isBanco?'lo':'em'));}
+  _aeFlagInput(stuId,_exTxt);
+}
+function _aeFlagInput(stuId,txt){
+  const inp=document.querySelector('#ae-list [data-stu-id="'+stuId+'"] input.ae-obt');
+  if(!inp)return;
+  inp.classList.toggle('exceso',!!txt);
+  inp.title=txt?('\u26a0 '+txt+' \u2014 la nota se limitar\u00e1 a 5.0 (m\u00edn. 1.0)'):'';
+}
+// Valores nuevos o cambiados que se salen de lo posible (para avisar antes de guardar)
+function _aeExcesos(act){
+  const out=[];
+  const data=getGrD(_ae.cId,_ae.asig,_ae.per);
+  const posGlobal=parseFloat(document.getElementById('ae-pos')?.value)||act.posibles||'';
+  getStuDs(_ae.cId,_ae.per).forEach(function(st){
+    const buf=_aeBuf[st.id];
+    if(!buf)return;
+    const saved=((data.scores||{})[st.id]||{})[act.id]||{};
+    if(act.actType==='entregas'){
+      (act.entregas||[]).forEach(function(e){
+        const raw=(buf.entregas||{})[e.id];
+        if(raw===undefined||raw===null||raw==='')return;
+        const o=(typeof raw==='object')?raw.obt:raw;
+        if(o===''||o===undefined||o===null)return;
+        const sv=(saved.entregas||{})[e.id];
+        const so=(sv&&typeof sv==='object')?sv.obt:sv;
+        if(so!==undefined&&so!==''&&so!==null&&Number(so)===Number(o))return;
+        const t=_exceso(o,e.posibles,_aeEntMode(e,raw));
+        if(t)out.push(st.nombre+' \u203a '+e.name+': '+t);
+      });
+    } else if(act.actType!=='banco'){
+      if(buf.obt===''||buf.obt===undefined||buf.obt===null)return;
+      if(saved.obt!==undefined&&saved.obt!==''&&Number(saved.obt)===Number(buf.obt))return;
+      const pos=(buf.posFixed&&buf.pos!=='')?buf.pos:posGlobal;
+      const t=_exceso(buf.obt,pos,false);
+      if(t)out.push(st.nombre+': '+t);
+    }
+  });
+  return out;
 }
 const aeAdjust=_dbFast(function(stuId,delta){
   // Increment/decrement points for banco-type activities
@@ -11367,7 +11461,7 @@ function aeAddCmt(stuId){
     const seg=getSeg(stuId);
     if(!seg.llamados)seg.llamados=[];
     seg.llamados.unshift({id:uid(),fecha,
-      desc:'Comentario en "'+esc(act.name)+'": '+text+(nota!==null?' · nota: '+nota.toFixed(1):''),
+      desc:'Comentario en "'+act.name+'": '+text+(nota!==null?' · nota: '+nota.toFixed(1):''),
       estado:'informado',tipo:'comentario_actividad',
       commentId:cmt.id,actId:actId,cId:cId,asig:asig,per:per});
     saveSeg();
@@ -11594,9 +11688,13 @@ function saveActEntry(){
 }
 // Wrapper: saveActEntry maneja entregas
 const _saveActEntryOrig=saveActEntry;
-saveActEntry=function(){
+saveActEntry=function(_force){
   const data=getGrD(_ae.cId,_ae.asig,_ae.per);
   const act=(data.activities||[]).find(function(a){return a.id===_ae.actId;});
+  if(act&&_force!==true){
+    const _ex=_aeExcesos(act);
+    if(_ex.length){_confirmExceso(_ex,function(){saveActEntry(true);});return;}
+  }
   if(act&&act.actType==='entregas'){
     if(!_aeEntregasPending()){toast('Sin cambios nuevos que guardar','s');return;}
     pushUndo('Calificar entregas — '+esc(act.name));
@@ -12806,7 +12904,7 @@ function _svInitBuf(){
     if(sc.comments&&sc.comments.length){
       // Normalizar: aeAddCmt usa {text,fecha}, svAddCmt usa {texto,fecha}
       cmts=sc.comments.map(function(c){
-        return {fecha:c.fecha||'',texto:c.texto||c.text||''};
+        return Object.assign({},c,{fecha:c.fecha||''}); // conserva id y claves originales (text/texto)
       });
     } else if(sc.comment){
       cmts=[{fecha:sc.commentDate||'',texto:sc.comment}];
@@ -12832,7 +12930,7 @@ function renderStuView(){
   const isParciales=evalMode==='parciales';
   document.getElementById('sv-stu-name').textContent=st.nombre;
   document.getElementById('sv-stu-sub').textContent=
-    (c?c.nombre+'· ':'')+(asig||'')+'· '+(per?'Per. '+per:'');
+    [c?c.nombre:'',asig||'',per?'Per. '+per:''].filter(Boolean).join(' \u00b7 ');
   const prevBtn=document.getElementById('sv-prev-btn');
   const nextBtn=document.getElementById('sv-next-btn');
   if(prevBtn)prevBtn.disabled=(idx===0);
@@ -12951,7 +13049,7 @@ function _svRenderAct(act, stuId, data){
         'background:rgba(99,102,241,.07);border-left:3px solid var(--ac);' +
         'border-radius:0 var(--rs) var(--rs) 0;padding:4px 8px;font-size:11px">' +
         (cm.fecha ? '<span style="color:var(--ink3);flex-shrink:0;font-size:10px">' + esc(cm.fecha) + '</span>' : '') +
-        '<span style="flex:1;color:var(--ink)">' + esc(cm.texto||cm.text||'') + '</span>' +
+        '<span id="sv-cmt-txt-' + act.id + '-' + i + '" style="flex:1;color:var(--ink)">' + esc(cm.texto||cm.text||'') + '</span>' +
         '<button onclick="svEditCmt(\'' + act.id + '\',' + i + ')" ' +
         'style="border:none;background:none;color:var(--ac);cursor:pointer;font-size:11px;padding:0;flex-shrink:0" title="Editar">\u270e</button> ' +
         '<button onclick="svDelCmt(\'' + act.id + '\',' + i + ')" ' +
@@ -13043,7 +13141,7 @@ function _svRenderAct(act, stuId, data){
         const savedModo = savedEntry && typeof savedEntry==='object' && savedEntry.modoNota!==undefined ? savedEntry.modoNota : null;
         const curObt = (storedObt!==undefined&&storedObt!==''&&storedObt!==null) ? storedObt : (savedObt??'');
         const efectiveModo = storedModo!==null ? storedModo : (savedModo!==null ? savedModo : (!!e.modoNota));
-        const nota2 = curObt!=='' ? (efectiveModo ? Number(curObt) : calcNota(Number(curObt),e.posibles||1)) : null;
+        const nota2 = curObt!=='' ? (efectiveModo?clampNota(curObt):calcNota(Number(curObt),e.posibles||1)) : null;
         return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;border-bottom:1px solid var(--br)">' +
           '<span style="flex:1;font-size:12px;font-weight:600">' + esc(e.name) + '</span>' +
           '<span style="font-size:10px;color:var(--ink3)">' + e.peso + '%' + (efectiveModo ? '' : (e.posibles ? ' / ' + e.posibles + ' pts' : '')) + '</span>' +
@@ -13052,29 +13150,36 @@ function _svRenderAct(act, stuId, data){
           ' data-act="' + act.id + '" data-eid="' + e.id + '" data-peso="' + e.peso + '"' +
           ' data-modo="' + (efectiveModo?'1':'0') + '" data-pos="' + (e.posibles||1) + '"' +
           ' style="width:64px;font-size:13px;font-weight:700;text-align:center;border:1px solid var(--br);border-radius:var(--rs);padding:4px 6px"' +
+          (curObt!==''&&_exceso(curObt,e.posibles,efectiveModo)?' class="exceso"':'') +
           ' oninput="svEntregaInput(this)">' +
           '<span id="sv-en-' + act.id + '-' + e.id + '" class="pn ' + (nota2!==null?notaCls(nota2):'em') + '" style="font-size:12px;font-weight:700;min-width:32px;text-align:right">' +
           (nota2 !== null ? nota2.toFixed(1) : '\u2014') + '</span>' +
+          (function(){
+            const cmE = (stored && typeof stored==='object' && stored.comment) ? stored.comment : ((savedEntry && typeof savedEntry==='object' && savedEntry.comment) ? savedEntry.comment : '');
+            return cmE ? '<div style="flex-basis:100%;font-size:11px;color:var(--ink3);padding-left:2px">\ud83d\udcac ' + esc(cmE) + '</div>' : '';
+          })() +
           '</div>';
       }).join('') + '</div>';
   } else {
     // Actividad normal — input editable
     const obt = buf.obt !== '' ? Number(buf.obt) : undefined;
-    const pos = act.posibles || 0;
+    const pos = _svPosEff(act);
     const notaE = (obt !== undefined && pos) ? calcNota(obt, pos) : null;
+    const exT = (obt !== undefined) ? _exceso(obt, pos, false) : '';
     const inputVal = _svModoNota && obt !== undefined && pos
-      ? (Math.round(((obt/pos)*4+1)*10)/10).toFixed(1) : (buf.obt || '');
+      ? calcNota(obt, pos).toFixed(1) : (buf.obt || '');
     panelContent =
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px">' +
       '<label style="font-size:11px;color:var(--ink3);font-weight:600">' + (_svModoNota ? 'Nota (1-5):' : 'Pts obtenidos:') + '</label>' +
       '<input type="number" id="sv-obt-' + act.id + '" min="' + (_svModoNota?1:0) + '" ' +
       (_svModoNota?'max="5" ':'') +
       'step="' + (_svModoNota?0.1:0.5) + '" value="' + inputVal + '" placeholder="' + (_svModoNota?'1.0':'0') + '"' +
+      (exT ? ' class="exceso"' : '') +
       ' style="width:70px;font-size:14px;font-weight:700;text-align:center;border:1px solid var(--br);border-radius:var(--rs);padding:4px 6px"' +
       ' oninput="svUpdateAct(\'' + act.id + '\',this.value)">' +
       (!_svModoNota ? '<span style="font-size:11px;color:var(--ink3)">/ ' + pos + ' pts</span>' : '') +
       '<span id="sv-nota-' + act.id + '" class="pn ' + (notaE!==null?notaCls(notaE):'em') + '" style="font-size:13px;font-weight:700;margin-left:4px">' +
-      (notaE !== null ? notaE.toFixed(1) : '\u2014') + '</span></div>';
+      (notaE !== null ? notaE.toFixed(1) : '\u2014') + (exT ? ' \u26a0' : '') + '</span></div>';
   }
 
   // Campo para nuevo comentario (dentro del panel colapsable)
@@ -13109,17 +13214,17 @@ function svBankAdj(actId, pilar, isPartBank, delta){
     const current=partTotal(data[bKey][_sv.stuId]);
     const floor=-maxPts;
     if(current+delta<floor){
-      toast('El total no puede bajar de −'+maxPts+' pts (nota 1.0)','e');
+      toast('El total no puede bajar de \u2212'+maxPts+' pts (nota 1.0)','e');
       return;
     }
   }
   if(delta!==0){
     data[bKey][_sv.stuId].push({fecha:today(),pts:delta,desc:'Vista estudiante'});
   }
-  _svDirty=true;
+  // El banco se guarda de inmediato: no deja cambios pendientes en la vista
   save();
   markGrDirty();
-  renderStuView();
+  _svRerender(actId);
 }
 
 // ── Ajustar banco personalizado desde vista de estudiante ──
@@ -13130,23 +13235,25 @@ function svBancoAdj(actId, delta){
   const maxPts=act.maxPtsBanco||10;
   if(!_svBuf[actId])_svBuf[actId]={obt:'0',pos:'',posFixed:false,comments:[],entregas:{}};
   const cur=_svBuf[actId].obt!==''?Number(_svBuf[actId].obt):0;
+  // Mismo piso que la ventana de entrada: no baja de -máx
+  if(delta<0&&cur+delta<-maxPts){toast('No puede bajar de \u2212'+maxPts,'e');return;}
   const newPts=cur+delta;
   _svBuf[actId].obt=String(newPts);
-  _svDirty=true;
-  const pct=maxPts>0?Math.min(100,Math.round(newPts/maxPts*100)):0;
+  _svDirty=_svChanges().length>0;
+  const pct=maxPts>0?Math.max(0,Math.min(100,Math.round(newPts/maxPts*100))):0;
   const notaB=calcNotaBanco(newPts,maxPts);
   const barColor=notaB!==null?(notaB>=4.5?'#22C55E':notaB>=4?'#5C8A2E':notaB>=3.5?'#7D6B12':notaB>=3?'#7D4912':'#8B2D27'):'var(--br)';
   const barEl=document.getElementById('sv-bar-'+actId);
   if(barEl){barEl.style.width=pct+'%';barEl.style.background=barColor;}
   const ptsEl=document.getElementById('sv-bpts-'+actId);
   if(ptsEl)ptsEl.textContent=(newPts>0?'+':'')+newPts;
+  _svUpdateFinal();
 }
 
 // ── Input de entrega individual en vista de estudiante ──
 function svEntregaInput(inp){
   const actId=inp.dataset.act;
   const entregaId=inp.dataset.eid;
-  const peso=Number(inp.dataset.peso);
   const modoNota=inp.dataset.modo==='1';
   const posibles=Number(inp.dataset.pos)||1;
   const val=inp.value;
@@ -13156,10 +13263,13 @@ function svEntregaInput(inp){
   const _prevEnt=_svBuf[actId].entregas[entregaId];
   const _prevCmt=_prevEnt&&typeof _prevEnt==='object'?(_prevEnt.comment||''):'';
   _svBuf[actId].entregas[entregaId]=val===''?'':{obt:Number(val),comment:_prevCmt,modoNota:modoNota};
-  _svDirty=true;
-  const nota=val===''?null:(modoNota?Number(val):calcNota(Number(val),posibles));
+  const exT=_exceso(val,posibles,modoNota);
+  inp.classList.toggle('exceso',!!exT);
+  inp.title=exT?('\u26a0 '+exT+' \u2014 la nota se limitar\u00e1 a 5.0 (m\u00edn. 1.0)'):'';
+  _svDirty=_svChanges().length>0;
+  const nota=val===''?null:(modoNota?clampNota(val):calcNota(Number(val),posibles));
   const el=document.getElementById('sv-en-'+actId+'-'+entregaId);
-  if(el){el.textContent=nota!==null?nota.toFixed(1):'\u2014';el.className='pn '+(nota!==null?notaCls(nota):'em');}
+  if(el){el.textContent=(nota!==null?nota.toFixed(1):'\u2014')+(exT?' \u26a0':'');el.className='pn '+(nota!==null?notaCls(nota):'em');}
   // Actualizar nota cabecera de la actividad
   const data=getGrD(_sv.cId,_sv.asig,_sv.per);
   const act=(data.activities||[]).find(function(a){return a.id===actId;});
@@ -13172,16 +13282,17 @@ function svEntregaInput(inp){
     const rawModo=raw&&typeof raw==='object'&&raw.modoNota!==undefined?raw.modoNota:(!!e.modoNota);
     const obt=rawObt!==undefined&&rawObt!==''&&rawObt!==null?rawObt:(entScores[e.id]?.obt??'');
     if(obt===''||obt===undefined||obt===null)return;
-    const n=rawModo?Number(obt):calcNota(Number(obt),e.posibles||1);
+    const n=rawModo?clampNota(obt):calcNota(Number(obt),e.posibles||1);
     if(n===null)return;
     pesoCalif+=e.peso;notaSum+=n*e.peso;
   });
-  const notaFinal=pesoCalif>0?Math.round(notaSum/pesoCalif*100)/100:null;
+  const notaFinal=pesoCalif>0?Math.round((notaSum/pesoCalif)*100)/100:null;
   const panel=document.getElementById('sv-edit-'+actId);
   if(panel&&panel.previousElementSibling){
     const hSpan=panel.previousElementSibling.querySelector('.pn');
     if(hSpan){hSpan.textContent=notaFinal!==null?notaFinal.toFixed(1):'\u2014';hSpan.className='pn '+(notaFinal!==null?notaCls(notaFinal):'em');}
   }
+  _svUpdateFinal();
 }
 
 
@@ -13194,22 +13305,26 @@ function svToggleEdit(actId){
 }
 
 function svUpdateAct(actId,val){
-  if(!_svBuf[actId])_svBuf[actId]={obt:'',pos:'',posFixed:false,comments:[]};
+  if(!_svBuf[actId])_svBuf[actId]={obt:'',pos:'',posFixed:false,comments:[],entregas:{}};
   const data=getGrD(_sv.cId,_sv.asig,_sv.per);
   const act=(data.activities||[]).find(function(a){return a.id===actId;});
-  const pos=act?act.posibles:0;
+  const pos=act?_svPosEff(act):0;
   let obt;
   if(_svModoNota&&val!==''&&pos){
-    obt=Math.max(0,Math.round(((parseFloat(val)-1)*pos/4)*100)/100);
+    obt=aeNota2Obt(parseFloat(val),pos);
     _svBuf[actId].obt=String(obt);
   } else {
     obt=val===''?undefined:parseFloat(val);
-    _svBuf[actId].obt=val===''?'':String(obt);
+    if(obt!==undefined&&isNaN(obt))obt=undefined;
+    _svBuf[actId].obt=obt===undefined?'':String(obt);
   }
   const nota=(obt!==undefined&&pos)?calcNota(obt,pos):null;
+  const exT=(obt!==undefined)?_exceso(obt,pos,false):'';
   const nEl=document.getElementById('sv-nota-'+actId);
-  if(nEl){nEl.textContent=nota?nota.toFixed(1):'—';nEl.className='pn '+(nota?notaCls(nota):'em');}
-  _svDirty=true;
+  if(nEl){nEl.textContent=(nota!==null?nota.toFixed(1):'\u2014')+(exT?' \u26a0':'');nEl.className='pn '+(nota!==null?notaCls(nota):'em');}
+  const inp=document.getElementById('sv-obt-'+actId);
+  if(inp){inp.classList.toggle('exceso',!!exT);inp.title=exT?('\u26a0 '+exT+' \u2014 la nota se limitar\u00e1 a 5.0 (m\u00edn. 1.0)'):'';}
+  _svDirty=_svChanges().length>0;
   _svUpdateFinal();
 }
 
@@ -13222,8 +13337,7 @@ function svAddCmt(actId){
   const svCmt={id:uid(),fecha:today(),texto:txt};
   _svBuf[actId].comments.push(svCmt);
   if(inp)inp.value='';
-  _svDirty=true;
-  // Guardar en data.scores de inmediato
+  // Los comentarios se guardan de inmediato (no cuentan como cambios pendientes)
   const data=getGrD(_sv.cId,_sv.asig,_sv.per);
   if(!data.scores)data.scores={};
   if(!data.scores[_sv.stuId])data.scores[_sv.stuId]={};
@@ -13236,55 +13350,68 @@ function svAddCmt(actId){
     const seg=getSeg(_sv.stuId);
     if(!seg.llamados)seg.llamados=[];
     seg.llamados.unshift({id:uid(),fecha:svCmt.fecha,
-      desc:'Comentario en "'+esc(act.name)+'": '+txt+(nota!==null?' · nota: '+nota.toFixed(1):''),
+      desc:'Comentario en "'+act.name+'": '+txt+(nota!==null?' · nota: '+nota.toFixed(1):''),
       estado:'informado',tipo:'comentario_actividad',
       commentId:svCmt.id,actId:actId,cId:_sv.cId,asig:_sv.asig,per:_sv.per});
     saveSeg();
   }
   save();
-  renderStuView();
+  _svRerender(actId);
 }
 
 function svEditCmt(actId, idx){
-  if(!_svBuf[actId]?.comments)return;
-  const cmt=_svBuf[actId].comments[idx];
-  if(!cmt)return;
-  const oldText=cmt.texto||cmt.text||'';
-  const newText=prompt('Editar comentario:',oldText);
-  if(newText===null)return; // cancelado
-  const trimmed=newText.trim();
-  if(trimmed===oldText)return; // sin cambios
-  // Actualizar en buffer
-  _svBuf[actId].comments[idx].texto=trimmed;
-  if(_svBuf[actId].comments[idx].text!==undefined)
-    _svBuf[actId].comments[idx].text=trimmed;
-  _svDirty=true;
-  // Persistir en data.scores
+  const cm=(_svBuf[actId]?.comments||[])[idx];
+  if(!cm)return;
+  const span=document.getElementById('sv-cmt-txt-'+actId+'-'+idx);
+  if(!span||span.querySelector('input'))return;
+  const oldText=cm.texto||cm.text||'';
+  // Edición en línea (sin prompt(): en el celular el cuadro nativo no siempre aparece)
+  span.innerHTML='<input type="text" value="'+esc(oldText)+'" style="width:100%;box-sizing:border-box;font-size:11px;padding:2px 5px;border:1px solid var(--ac);border-radius:var(--rs);background:var(--sf);color:var(--ink)">';
+  const inp=span.firstChild;
+  inp.focus();inp.select();
+  let done=false;
+  const finish=function(commit){
+    if(done)return;done=true;
+    if(commit)svCmtCommit(actId,idx,inp.value,span);
+    else span.textContent=oldText;
+  };
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){e.preventDefault();finish(true);}
+    else if(e.key==='Escape'){e.preventDefault();finish(false);}
+  });
+  inp.addEventListener('blur',function(){finish(true);});
+}
+
+function svCmtCommit(actId,idx,newText,span){
+  const cm=(_svBuf[actId]?.comments||[])[idx];
+  if(!cm)return;
+  const oldText=cm.texto||cm.text||'';
+  const trimmed=(newText||'').trim();
+  if(!trimmed||trimmed===oldText){if(span)span.textContent=oldText;return;} // vacío o sin cambios
+  if(cm.texto!==undefined)cm.texto=trimmed;
+  if(cm.text!==undefined)cm.text=trimmed;
+  if(cm.texto===undefined&&cm.text===undefined)cm.texto=trimmed;
+  if(span)span.textContent=trimmed;
   const data=getGrD(_sv.cId,_sv.asig,_sv.per);
-  if(data.scores?.[_sv.stuId]?.[actId]?.comments){
-    const sc=data.scores[_sv.stuId][actId].comments;
-    if(sc[idx]){
-      if(sc[idx].texto!==undefined)sc[idx].texto=trimmed;
-      if(sc[idx].text!==undefined)sc[idx].text=trimmed;
-    }
-  }
-  // Actualizar llamado correspondiente en historial
-  if(cmt.id){
+  if(!data.scores)data.scores={};
+  if(!data.scores[_sv.stuId])data.scores[_sv.stuId]={};
+  if(!data.scores[_sv.stuId][actId])data.scores[_sv.stuId][actId]={};
+  data.scores[_sv.stuId][actId].comments=_svBuf[actId].comments.slice();
+  // Actualizar el llamado correspondiente en el historial
+  if(cm.id){
     const seg=getSeg(_sv.stuId);
     const ll=(seg.llamados||[]).find(function(l){
-      return l.tipo==='comentario_actividad'&&l.commentId===cmt.id;
+      return l.tipo==='comentario_actividad'&&l.commentId===cm.id;
     });
     if(ll){
-      // Reconstruir desc con el nuevo texto
       const act=(data.activities||[]).find(function(a){return a.id===actId;});
       const nota=act?getActNota(data,act,_sv.stuId):null;
-      ll.desc='Comentario en "'+(act?esc(act.name):actId)+'": '+trimmed+
+      ll.desc='Comentario en "'+(act?act.name:actId)+'": '+trimmed+
         (nota!==null?' · nota: '+nota.toFixed(1):'');
       saveSeg();
     }
   }
   save();
-  renderStuView();
 }
 
 
@@ -13292,7 +13419,6 @@ function svDelCmt(actId,idx){
   if(!_svBuf[actId]||!_svBuf[actId].comments)return;
   const cmt=_svBuf[actId].comments[idx];
   _svBuf[actId].comments.splice(idx,1);
-  _svDirty=true;
   // Persistir en data.scores
   const data=getGrD(_sv.cId,_sv.asig,_sv.per);
   if(data.scores?.[_sv.stuId]?.[actId]){
@@ -13304,26 +13430,28 @@ function svDelCmt(actId,idx){
     const li=(seg.llamados||[]).findIndex(function(l){
       return l.tipo==='comentario_actividad'&&(
         (l.commentId&&l.commentId===cmt.id)||
-        (l.fecha===cmt.fecha&&l.desc&&l.desc.includes(cmt.texto||cmt.text||''))
+        (!l.commentId&&l.fecha===cmt.fecha&&l.desc&&l.desc.includes(cmt.texto||cmt.text||''))
       );
     });
     if(li>=0){seg.llamados.splice(li,1);saveSeg();}
   }
   save();
-  renderStuView();
+  _svRerender(actId);
 }
 
 function svToggleModo(){
   _svModoNota=document.getElementById('sv-modo-nota').checked;
-  renderStuView();
+  _svRerender();
 }
 
 function _svUpdateFinal(){
   const data=getGrD(_sv.cId,_sv.asig,_sv.per);
   const co=getC(_sv.cId);
   const evalMode=co?.evalMode||'normal';
-  // Usar acumNota — idéntica a la planilla definitiva, sin recalcular
-  const nota=acumNota(data,_sv.stuId,evalMode);
+  // Nota estimada = lo guardado + los cambios pendientes de esta vista (acumNota igual que la planilla definitiva)
+  let nota;
+  try{ nota=acumNota(_svPreviewData(data),_sv.stuId,evalMode); }
+  catch(err){ nota=acumNota(data,_sv.stuId,evalMode); }
   const el=document.getElementById('sv-nota-final');
   if(el){
     el.textContent=nota!==null?nota.toFixed(1):'—';
@@ -13331,65 +13459,141 @@ function _svUpdateFinal(){
   }
 }
 
-function svSave(){
-  if(!_svDirty){
+// Posibles reales de una actividad para este estudiante (pos propio si existe, si no el de la actividad)
+function _svPosEff(act){
+  const b=_svBuf[act.id];
+  if(b&&b.pos!==''&&b.pos!==undefined&&b.pos!==null&&!isNaN(Number(b.pos)))return Number(b.pos);
+  return Number(act.posibles)||0;
+}
+
+// Cambios reales de la vista (buffer vs. guardado): fuente única para "sin guardar", guardado y avisos
+function _svChanges(){
+  const out=[];
+  if(!_sv||!_sv.stuId)return out;
+  const data=getGrD(_sv.cId,_sv.asig,_sv.per);
+  const stSc=(data.scores||{})[_sv.stuId]||{};
+  const num=function(v){
+    if(v===undefined||v===null||v==='')return '';
+    const n=Number(v);
+    return isNaN(n)?'':n;
+  };
+  (data.activities||[]).forEach(function(act){
+    if(act.auto&&!act.partBank&&!act.tareasBank)return; // asistencia automática
+    if(act.partBank||act.tareasBank)return;             // bancos: se guardan al instante
+    const buf=_svBuf[act.id];
+    if(!buf)return;
+    const sc=stSc[act.id]||{};
+    if(act.actType==='entregas'){
+      (act.entregas||[]).forEach(function(e){
+        const b=(buf.entregas||{})[e.id];
+        const s=(sc.entregas||{})[e.id];
+        const bv=num(b&&typeof b==='object'?b.obt:b);
+        const sv=num(s&&typeof s==='object'?s.obt:s);
+        if(bv===sv)return;
+        const modo=(b&&typeof b==='object'&&b.modoNota!==undefined)?!!b.modoNota
+          :((s&&typeof s==='object'&&s.modoNota!==undefined)?!!s.modoNota:!!e.modoNota);
+        out.push({act:act,kind:'ent',eId:e.id,e:e,v:bv,modo:modo});
+      });
+    } else {
+      const bv=num(buf.obt);
+      const sv=num(sc.obt);
+      if(bv!==sv)out.push({act:act,kind:'obt',v:bv});
+    }
+  });
+  return out;
+}
+
+// Copia de los datos con los cambios pendientes aplicados (solo para estimar la nota final)
+function _svPreviewData(data){
+  const clone=Object.assign({},data);
+  clone.scores=Object.assign({},data.scores||{});
+  const stu=Object.assign({},clone.scores[_sv.stuId]||{});
+  _svChanges().forEach(function(c){
+    const e=Object.assign({},stu[c.act.id]||{});
+    if(c.kind==='obt'){
+      if(c.v==='')delete e.obt; else e.obt=c.v;
+    } else {
+      e.entregas=Object.assign({},e.entregas||{});
+      if(c.v==='')delete e.entregas[c.eId];
+      else e.entregas[c.eId]={obt:c.v,modoNota:c.modo};
+    }
+    stu[c.act.id]=e;
+  });
+  clone.scores[_sv.stuId]=stu;
+  return clone;
+}
+
+// Repinta la vista sin cerrar el panel abierto ni perder el scroll
+function _svRerender(keepActId){
+  const bd=document.querySelector('#stu-view-ov .bank-body');
+  const top=bd?bd.scrollTop:0;
+  let openId=keepActId||null;
+  if(!openId){
+    const o=Array.prototype.find.call(document.querySelectorAll('[id^="sv-edit-"]'),function(e){return e.style.display==='flex';});
+    if(o)openId=o.id.slice(8);
+  }
+  renderStuView();
+  if(openId){const p=document.getElementById('sv-edit-'+openId);if(p)p.style.display='flex';}
+  const bd2=document.querySelector('#stu-view-ov .bank-body');
+  if(bd2)bd2.scrollTop=top;
+}
+
+function svSave(force){
+  const ch=_svChanges();
+  if(!ch.length){
+    _svDirty=false;
     toast('Sin cambios pendientes','i');
     return;
+  }
+  if(force!==true){
+    const ex=[];
+    ch.forEach(function(c){
+      const t=c.kind==='obt'?_exceso(c.v,_svPosEff(c.act),false):_exceso(c.v,c.e.posibles,c.modo);
+      if(t)ex.push(c.act.name+(c.kind==='ent'?' \u203a '+c.e.name:'')+': '+t);
+    });
+    if(ex.length){_confirmExceso(ex,function(){svSave(true);});return;}
   }
   pushUndo('Editar notas — '+(_sv.studs.find(function(s){return s.id===_sv.stuId;})||{nombre:''}).nombre);
   const data=getGrD(_sv.cId,_sv.asig,_sv.per);
   if(!data.scores)data.scores={};
   if(!data.scores[_sv.stuId])data.scores[_sv.stuId]={};
-  Object.keys(_svBuf).forEach(function(actId){
-    const buf=_svBuf[actId];
-    const act=(data.activities||[]).find(function(a){return a.id===actId;});
-    if(!act)return;
-    // Actividad de asistencia automática pura — no tocar nada
-    if(act.auto&&!act.partBank&&!act.tareasBank)return;
-    // Bancos auto (partBank/tareasBank): solo guardar comentarios,
-    // nunca tocar data.scores[stuId][actId].obt (nota calculada en vivo)
-    if(act.partBank||act.tareasBank){
-      const hasCmtsBanco=(buf.comments&&buf.comments.length>0);
-      if(hasCmtsBanco){
-        if(!data.scores[_sv.stuId][actId])data.scores[_sv.stuId][actId]={};
-        data.scores[_sv.stuId][actId].comments=buf.comments;
-      }
-      return;
-    }
-    const hasCmts=(buf.comments&&buf.comments.length>0);
-    const hasObt=(buf.obt!==''&&buf.obt!==undefined);
-    if(act.actType==='entregas'){
-      if(!data.scores[_sv.stuId][actId])data.scores[_sv.stuId][actId]={};
-      if(!data.scores[_sv.stuId][actId].entregas)data.scores[_sv.stuId][actId].entregas={};
-      Object.keys(buf.entregas||{}).forEach(function(eId){
-        const v=(buf.entregas||{})[eId];
-        if(v===undefined||v==='')delete data.scores[_sv.stuId][actId].entregas[eId];
-        else data.scores[_sv.stuId][actId].entregas[eId]={obt:Number(v)};
-      });
-      if(hasCmts)data.scores[_sv.stuId][actId].comments=buf.comments;
-    } else if(!hasObt&&!hasCmts){
-      // Sin puntos ni comentarios — borrar el entry si existe
-      delete data.scores[_sv.stuId][actId];
-    } else if(!hasObt&&hasCmts){
-      // Solo comentarios — guardar sin tocar obt
-      const prev=data.scores[_sv.stuId][actId]||{};
-      data.scores[_sv.stuId][actId]={...prev,comments:buf.comments};
+  const stu=data.scores[_sv.stuId];
+  // Solo se escriben las actividades/entregas que cambiaron; pos, posFixed, comentarios y recuperación no se tocan
+  ch.forEach(function(c){
+    const actId=c.act.id;
+    if(!stu[actId])stu[actId]={};
+    const entry=stu[actId];
+    if(c.kind==='obt'){
+      if(c.v==='')delete entry.obt; else entry.obt=c.v;
     } else {
-      // Tiene puntos (y quizás comentarios)
-      const prev=data.scores[_sv.stuId][actId]||{};
-      data.scores[_sv.stuId][actId]={...prev,obt:Number(buf.obt),pos:act.posibles,comments:buf.comments||[]};
+      const ents=entry.entregas||(entry.entregas={});
+      const prevE=ents[c.eId];
+      const prevObj=(prevE&&typeof prevE==='object')?prevE:((prevE!==undefined&&prevE!==null&&prevE!=='')?{obt:Number(prevE)}:{});
+      if(c.v===''){
+        const keep=prevObj.comment;
+        delete prevObj.obt;delete prevObj.modoNota;
+        if(keep)ents[c.eId]=prevObj; else delete ents[c.eId];
+      } else {
+        ents[c.eId]=Object.assign({},prevObj,{obt:c.v,modoNota:c.modo});
+      }
+      if(!Object.keys(ents).length)delete entry.entregas;
     }
+    // Limpiar entradas que quedaron vacías
+    const vacio=(entry.obt===undefined||entry.obt==='')&&!(entry.comments&&entry.comments.length)&&
+      !(entry.entregas&&Object.keys(entry.entregas).length)&&!entry.recovery&&!entry.posFixed&&!entry.comment;
+    if(vacio)delete stu[actId];
   });
   save();markGrDirty();renderGrades();
+  _svInitBuf();   // el buffer vuelve a reflejar lo guardado (conserva ids de comentarios)
   _svDirty=false;
-  toast('✅ Notas guardadas','s');
+  toast('\u2705 Notas guardadas \u2014 '+ch.length+' cambio'+(ch.length===1?'':'s'),'s');
   // NO cerrar la vista — el docente puede seguir editando o navegar al siguiente
-  renderStuView();
+  _svRerender();
 }
 
 function svNav(dir){
   if(_svDirty){
-    if(!confirm('Tienes cambios sin guardar.\n\n\u00bfPasar al siguiente estudiante sin guardar?'))return;
+    if(!confirm('Tienes cambios sin guardar.\n\n\u00bfPasar al estudiante '+(dir<0?'anterior':'siguiente')+' sin guardar?'))return;
   }
   const idx=_sv.studs.findIndex(function(s){return s.id===_sv.stuId;});
   const next=_sv.studs[idx+dir];
@@ -13400,6 +13604,7 @@ function svNav(dir){
   const chk=document.getElementById('sv-modo-nota');
   if(chk)chk.checked=false;
   renderStuView();
+  const bd=document.querySelector('#stu-view-ov .bank-body');if(bd)bd.scrollTop=0;
 }
 
 function closeStuView(){
@@ -13891,9 +14096,9 @@ if('serviceWorker' in navigator){
         <button class="btn sm" onclick="svNav(1)" id="sv-next-btn" title="Estudiante siguiente">Siguiente ▶</button>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
-        <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--ink3);cursor:pointer">
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--ink3);cursor:pointer;white-space:nowrap" title="Escribir la nota (1.0–5.0) en vez de los puntos">
           <input type="checkbox" id="sv-modo-nota" onchange="svToggleModo()" style="accent-color:var(--ac)">
-          Modo nota directa
+          Nota directa
         </label>
         <button class="mx" onclick="closeStuView()">✕</button>
       </div>
