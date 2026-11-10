@@ -55,6 +55,18 @@ body{font-family:'Epilogue',sans-serif;background:var(--bg);color:var(--ink);min
 .hist-hdr{padding:6px 14px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.35);border-bottom:1px solid rgba(255,255,255,.1);}
 .tb-btn:disabled{opacity:.35;cursor:not-allowed;}
 .tb-btn:disabled:hover{background:rgba(255,255,255,.08);}
+/* Indicador de guardado / sincronización */
+.tb-save{position:relative;min-width:34px;justify-content:center;padding:5px 9px;}
+.tb-save .ss-dot{position:absolute;top:2px;right:2px;width:9px;height:9px;border-radius:50%;border:2px solid var(--ink);background:#9CA3AF;box-sizing:content-box;}
+.tb-save[data-s="ok"] .ss-dot{background:#22C55E;}
+.tb-save[data-s="sync"] .ss-dot{background:#60A5FA;animation:ssPulse 1s ease-in-out infinite;}
+.tb-save[data-s="warn"] .ss-dot{background:#F59E0B;}
+.tb-save[data-s="warn"]{border-color:#F59E0B;}
+.tb-save[data-s="err"] .ss-dot{background:#EF4444;}
+.tb-save[data-s="open"] .ss-dot{background:#9CA3AF;}
+@media(max-width:480px){.tb-lbl{display:none;}.tb-right{gap:5px;}.tb-right .tb-btn{padding:5px 8px;}.tb-title,.tb-yr,.tb-brand>div>div:last-child{display:none !important;}.tb-brand{white-space:nowrap;}#tp span#tp-nm{display:none !important;}#tp{padding:4px 6px !important;margin:0 4px !important;}}
+@keyframes ssPulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.35;transform:scale(.8);}}
+@media(prefers-reduced-motion:reduce){.tb-save[data-s="sync"] .ss-dot{animation:none;}}
 .tb-btn.primary{background:var(--ac);border-color:transparent;}
 .tb-btn.primary:hover{background:#2450c8;}
 .tp-av{width:28px;height:28px;border-radius:50%;background:var(--ac);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;color:#fff;flex-shrink:0;}
@@ -876,18 +888,19 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
     <span id="tp-nm" style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#E5E7EB">Mi perfil</span>
   </div>
   <div class="tb-right">
+    <button class="tb-btn tb-save" id="btn-save-state" data-s="ok" onclick="onSaveStateTap()" title="Estado del guardado" aria-label="Estado del guardado"><span class="ss-ic" aria-hidden="true">💾</span><span class="ss-dot" aria-hidden="true"></span></button>
     <div style="position:relative">
-      <button class="tb-btn" onclick="toggleUndoMenu()" id="btn-undo" disabled title="Deshacer">↩ Deshacer ▾</button>
+      <button class="tb-btn" onclick="toggleUndoMenu()" id="btn-undo" disabled title="Deshacer">↩<span class="tb-lbl"> Deshacer</span> ▾</button>
       <div id="undo-menu" class="hist-menu" style="display:none;position:fixed;top:56px;left:auto;right:auto"></div>
     </div>
     <div style="position:relative">
-      <button class="tb-btn" onclick="toggleRedoMenu()" id="btn-redo" disabled title="Rehacer">↪ Rehacer ▾</button>
+      <button class="tb-btn" onclick="toggleRedoMenu()" id="btn-redo" disabled title="Rehacer">↪<span class="tb-lbl"> Rehacer</span> ▾</button>
       <div id="redo-menu" class="hist-menu" style="display:none;position:fixed;top:56px;left:auto;right:auto"></div>
     </div>
-    <button class="tb-btn" onclick="openHelp()" id="btn-help" title="Ayuda">❓ Ayuda</button>
+    <button class="tb-btn" onclick="openHelp()" id="btn-help" title="Ayuda">❓<span class="tb-lbl"> Ayuda</span></button>
     <button class="tb-btn" id="btn-fullscreen" onclick="toggleFullscreen()" title="Pantalla completa">⛶</button>
-    <button class="tb-btn" id="btn-cloud-save" onclick="cloudSaveAll()" title="Sincronizar con Drive" style="display:none">💾 Guardar</button>
-    <button class="tb-btn" onclick="exitApp()" title="Salir de la aplicación" style="color:rgba(255,255,255,.6)">⏻ Salir</button>
+    
+    <button class="tb-btn" onclick="exitApp()" title="Salir de la aplicación" style="color:rgba(255,255,255,.6)">⏻<span class="tb-lbl"> Salir</span></button>
   </div>
 </div>
 
@@ -5585,6 +5598,103 @@ function cloudSaveAll(){
     if(btn){btn.textContent='💾 Guardar';btn.disabled=false;}
   });
 }
+
+// ══════════════════════════
+// INDICADOR DE GUARDADO / SINCRONIZACIÓN (barra superior)
+// Estados: ok (verde) · sync (azul) · warn (ámbar) · err (rojo) · open (gris: ventana abierta sin verificar)
+// Nunca afirma "todo guardado" si hay una ventana de edición abierta con cambios sin confirmar.
+// ══════════════════════════
+const _SS_OVERLAYS=['rm-ov','cm-ov','date-ov','act-ov','edit-act-ov','est-ov','act-entry-ov','pxc-cfg-ov','qfill-ov','part-ov','tareas-ov','pxc-grade-ov','stu-view-ov'];
+let _ssDriveOk=false,_ssDriveT=0,_ssSyncSince=0;
+function _ssOpen(id){var el=document.getElementById(id);return !!(el&&el.classList.contains('open'));}
+function _ssAeUnsaved(){
+  // Mismo criterio que closeActEntry(): comentario sin guardar o _aeBuf distinto de lo guardado
+  try{
+    var ins=document.querySelectorAll('[id^="ae-new-cmt-"]');
+    for(var i=0;i<ins.length;i++){if(ins[i].value&&ins[i].value.trim())return true;}
+    if(!_ae||!_ae.actId||!_aeBuf)return false;
+    var ids=Object.keys(_aeBuf);if(!ids.length)return false;
+    var data=getGrD(_ae.cId,_ae.asig,_ae.per);
+    var s2=function(v){return v===undefined||v===null?'':String(v);};
+    return ids.some(function(id){
+      var s=((data.scores[id]||{})[_ae.actId])||{},b=_aeBuf[id]||{};
+      return s2(b.obt)!==s2(s.obt)||s2(b.pos)!==s2(s.pos);
+    });
+  }catch(e){return false;}
+}
+function _ssPending(){
+  // flush:   datos globales que el botón puede guardar/sincronizar por sí mismo
+  // windows: cambios en buffers de ventanas abiertas (solo se confirman con el botón de esa ventana)
+  // open:    ventanas de edición abiertas (no verificables)
+  var flush=[],windows=[],open=[];
+  try{
+    if(attDirty)flush.push('asistencia');
+    if(grDirty)flush.push('calificaciones');
+    if(_ssOpen('rm-ov')&&rmHasChanges())windows.push('registro');
+    if(_ssOpen('act-ov')&&actHasChanges())windows.push('nueva actividad');
+    if(_ssOpen('edit-act-ov')&&editActHasChanges())windows.push('editar actividad');
+    if(_ssOpen('act-entry-ov')&&_ssAeUnsaved())windows.push('actividad');
+    if(_ssOpen('stu-view-ov')&&_svDirty)windows.push('vista del estudiante');
+    if(_ssOpen('pxc-grade-ov')&&_pxcDirty)windows.push('PxC');
+  }catch(e){}
+  _SS_OVERLAYS.forEach(function(id){if(_ssOpen(id))open.push(id);});
+  return {flush:flush,windows:windows,open:open};
+}
+function _ssDrive(force){
+  // _isDriveReady() puede consultar el puente de Android: se cachea 30 s
+  var n=Date.now();
+  if(force||n-_ssDriveT>30000){try{_ssDriveOk=!!_isDriveReady();}catch(e){_ssDriveOk=false;}_ssDriveT=n;}
+  return _ssDriveOk;
+}
+function _ssHora(ts){try{return new Date(ts).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});}catch(e){return '';}}
+let _ssFast=0;
+function _ssUpdate(forceDrive){
+  try{_ssUpdate2(forceDrive);}catch(e){}
+  // Mientras sincroniza, refresca rápido para pasar de azul a verde apenas termine (máx. 30 s)
+  if(!_ssFast&&syncStatus==='syncing'){
+    _ssFast=setInterval(function(){
+      try{_ssUpdate2(false);}catch(e){}
+      if(syncStatus!=='syncing'||(_ssSyncSince&&Date.now()-_ssSyncSince>=30000)){clearInterval(_ssFast);_ssFast=0;}
+    },400);
+  }
+}
+function _ssUpdate2(forceDrive){
+  var b=document.getElementById('btn-save-state');if(!b)return;
+  var p=_ssPending(),drive=_ssDrive(forceDrive),now=Date.now(),st,t;
+  if(syncStatus==='syncing'){if(!_ssSyncSince)_ssSyncSince=now;}else{_ssSyncSince=0;}
+  var syncing=drive&&syncStatus==='syncing'&&(now-_ssSyncSince)<30000;
+  if(typeof _licReadonly!=='undefined'&&_licReadonly){st='err';t='Modo lectura: los cambios no se guardan. Activa tu licencia.';}
+  else if(p.windows.length){st='warn';t='Cambios sin confirmar en: '+p.windows.join(', ')+'. Guarda con el botón de esa ventana.';}
+  else if(p.flush.length){st='warn';t='Pendiente de guardar: '+p.flush.join(' y ')+'. Toca para guardar'+(drive?' y sincronizar.':'.');}
+  else if(syncing){st='sync';t='Sincronizando con Drive…';}
+  else if(drive&&syncStatus==='error'){st='err';t='No se pudo sincronizar con Drive. Toca para reintentar.';}
+  else if(p.open.length){st='open';t='Hay una ventana abierta: confirma sus cambios con su botón Guardar.';}
+  else{
+    st='ok';
+    t='Todo guardado en este dispositivo'+(drive?(lastSync?' · Drive sincronizado a las '+_ssHora(lastSync):' · Drive conectado'):' · Drive sin conectar')+' — toca para guardar y sincronizar';
+  }
+  if(b.getAttribute('data-s')!==st)b.setAttribute('data-s',st);
+  if(b.title!==t){b.title=t;b.setAttribute('aria-label',t);}
+}
+function onSaveStateTap(){
+  if(typeof _licReadonly!=='undefined'&&_licReadonly){toast('Modo lectura activo — active su licencia para guardar cambios','e');return;}
+  var p=_ssPending();
+  if(p.windows.length){
+    // Hay cambios en una ventana abierta: el botón global NO puede confirmarlos.
+    // Se asegura lo ya confirmado en local y se avisa; la sincronización se hará al guardar en la ventana.
+    if(attDirty){localStorage.setItem(SK.a,JSON.stringify(attendance));attDirty=false;}
+    save(true);
+    toast('⚠️ Falta guardar en la ventana abierta: '+p.windows.join(', ')+'. Usa su botón Guardar.','e');
+  } else {
+    cloudSaveAll();
+    if(p.open.length&&!p.flush.length)toast('Datos guardados. Hay una ventana abierta: confirma sus cambios con su botón Guardar.','s');
+  }
+  _ssUpdate(true);
+  setTimeout(function(){_ssUpdate(true);},1500);
+}
+setInterval(function(){if(!document.hidden)_ssUpdate();},1500);
+document.addEventListener('visibilitychange',function(){if(!document.hidden)_ssUpdate(true);});
+setTimeout(function(){try{_ssUpdate(true);}catch(e){}},800);
 
 // ══════════════════════════
 // ══════════════════════════
