@@ -1048,6 +1048,19 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
             <div class="fg"><label>Asignatura</label>
               <select id="anual-asig"></select></div>
           </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:12px">
+            <label class="inf-toggle-card" for="anual-nopxc">
+              <div class="inf-toggle-icon">🏆</div>
+              <div class="inf-toggle-text">
+                <div class="inf-toggle-title">Sin Prueba por Competencias</div>
+                <div class="inf-toggle-sub">Usa promedio SABER+HACER+SER en su lugar</div>
+              </div>
+              <div class="inf-toggle-switch">
+                <input type="checkbox" id="anual-nopxc" onchange="anualToggleNoPxc()">
+                <span class="inf-toggle-slider"></span>
+              </div>
+            </label>
+          </div>
           <div id="anual-weights-info" style="font-size:12px;color:var(--ink2);margin-bottom:12px;background:var(--sf2);border-radius:var(--rs);padding:8px 11px;display:none"></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn primary" onclick="generateAnualReport()">📈 Generar reporte</button>
@@ -7974,7 +7987,7 @@ const HELP_SECTIONS=[
         <div class="help-step"><span class="help-num">⚠️</span><div><strong>Reporte de alerta temprana</strong><br>En la pestaña <em>Alertas</em>, elija el curso, el período, la nota mínima de alerta (ej: 3.5) y el porcentaje mínimo de asistencia (ej: 75%). La app genera una lista de estudiantes en riesgo académico o de inasistencia.</div></div>
         <div class="help-step"><span class="help-num">📋</span><div><strong>Plan de mejoramiento</strong><br>En la tabla de alertas, cada estudiante con nota perdida tiene el botón <em>📋 PM</em>. Al usarlo puede registrar la nota del plan de mejoramiento y esta reemplaza la nota perdida en el cálculo definitivo.</div></div>
         <div class="help-step"><span class="help-num">📄</span><div><strong>Informe Final de Período</strong><br>Genera un reporte por curso con las notas definitivas de todos los estudiantes, listo para imprimir o compartir con coordinación.</div></div>
-        <div class="help-step"><span class="help-num">📈</span><div><strong>Progreso Anual</strong><br>Muestra cómo ha evolucionado la nota definitiva de cada estudiante período a período. También calcula qué nota necesita en los períodos que faltan para aprobar con 3.0. Los períodos a los que les faltan pilares por evaluar se marcan «parcial» y se cuentan proporcional a lo ya evaluado; cuando hay información de todos los períodos, la columna pasa a «Definitiva del año». Solo aplica a cursos por períodos (no semestrales).</div></div>
+        <div class="help-step"><span class="help-num">📈</span><div><strong>Progreso Anual</strong><br>Muestra cómo ha evolucionado la nota definitiva de cada estudiante período a período. También calcula qué nota necesita en los períodos que faltan para aprobar con 3.0. La nota de cada período es la NOTA FINAL de la planilla (si todavía le faltan pilares se marca «parcial» y cuenta tal cual). Si la asignatura no lleva prueba por competencias, active «Sin Prueba por Competencias». Cuando hay información de todos los períodos, la columna pasa a «Definitiva del año». Solo aplica a cursos por períodos (no semestrales).</div></div>
         <div class="help-step"><span class="help-num">🖨️</span><div><strong>Imprimir o guardar</strong><br>Todos los reportes tienen botón de impresión. También puede exportar las planillas de notas y asistencia a hoja de cálculo desde el panel de Exportar.</div></div>
       </div>
     `
@@ -8790,42 +8803,14 @@ function _grDRO(cId,asig,per){
   const d=((grades[cId]||{})[asig]||{})[per];
   return d||{activities:[],scores:{}};
 }
-// Pilares que esta asignatura realmente usa (tienen al menos una actividad en algún período)
-function _pillarsInUse(cId,asig,pers){
-  const used={};
-  pers.forEach(function(p){
-    const d=_grDRO(cId,asig,p.id);
-    (d.activities||[]).forEach(function(a){if(PWTS[a.pilar]!==undefined)used[a.pilar]=true;});
-  });
-  return Object.keys(PWTS).filter(function(k){return used[k];});
-}
-// ¿La actividad tiene un dato real del estudiante? (un banco sin puntos no cuenta: su 3.0 es solo el valor por defecto)
-function _actHasData(d,a,stuId){
-  if(a.partBank){const e=(d['participacion_'+_actPilar(a)]||{})[stuId];return !!(e&&e.length);}
-  if(a.tareasBank){const e=(d['tareas_'+_actPilar(a)]||{})[stuId];return !!(e&&e.length);}
-  return getActNota(d,a,stuId)!==null;
-}
-function _pillarReal(d,k,stuId){
-  return (d.activities||[]).some(function(a){return a.pilar===k&&_actHasData(d,a,stuId);});
-}
-// Nota de un estudiante en un período: promedio ponderado de los pilares que ya tienen nota real,
-// proporcional a lo evaluado (parcial = faltan pilares de los que la asignatura usa).
-function _anualPeriodo(d,stuId,inUse){
-  const pil={};let wSum=0,wTot=0;
-  inUse.forEach(function(k){
-    if(_pillarReal(d,k,stuId)){
-      const v=pillarAvgForStu(d,k,stuId);
-      if(v!==null){pil[k]=v;wSum+=v*PWTS[k];wTot+=PWTS[k];}
-    }
-  });
-  const wUse=inUse.reduce(function(s,k){return s+PWTS[k];},0);
-  if(wTot<=0)return {nota:null,parcial:false,pct:0,pil:pil,ausente:false};
-  return {
-    nota:Math.round(wSum/wTot*10)/10,
-    parcial:wTot<wUse-1e-9,
-    pct:wUse>0?Math.round(wTot/wUse*100):100,
-    pil:pil,ausente:false
-  };
+// Nota de un estudiante en un período = la NOTA FINAL de la planilla (misma función que usa el Informe final).
+// "Parcial" = la planilla aún no tiene todos los pilares (con "Sin PxC" el PxC se reemplaza por el promedio S+H+R).
+function _anualPeriodo(d,st,pcfg,noPxc){
+  const row=buildStudentRow(st,d,pcfg,noPxc);
+  if(row.finalNota===null)return {nota:null,parcial:false,pct:0,faltan:[],ausente:false};
+  const wAll=pcfg.keys.reduce(function(s,k){return s+pcfg.weights[k];},0);
+  const faltan=pcfg.keys.filter(function(k){const p=row.pillars[k];return !p||p.avg===null||p.avg===undefined;}).map(function(k){return PNAMES[k]||k;});
+  return {nota:row.finalNota,parcial:row.wTot<wAll-1e-9,pct:wAll>0?Math.round(row.wTot/wAll*100):100,faltan:faltan,ausente:false};
 }
 
 // Helper: compute period final grade from pillars for one student
@@ -8844,12 +8829,13 @@ function getPerWeights(pers){
 }
 
 // ── Shared anual data calculator (reporte, tarjetas y Excel) ──
-function _calcAnualData(cId,asig){
+function _calcAnualData(cId,asig,noPxc){
   const co=getC(cId);
   const pers=getPers(cId);
   const weights=getPerWeights(pers);
   const PASS=3.0;
-  const inUse=_pillarsInUse(cId,asig,pers);
+  if(noPxc===undefined)noPxc=!!(document.getElementById('anual-nopxc')&&document.getElementById('anual-nopxc').checked);
+  const pcfg=getPillarCfg(cId);
   // Unión de los estudiantes de todos los períodos, cruzados por nombre
   const map=new Map();
   const perHasStuds=pers.map(function(p){return (((students[cId]||{})[p.id])||[]).length>0;});
@@ -8869,8 +8855,8 @@ function _calcAnualData(cId,asig){
     const st={id:firstId,nombre:e.nombre};
     const per=pers.map(function(p,i){
       const sid=e.ids[p.id];
-      if(!sid)return {nota:null,parcial:false,pct:0,pil:{},ausente:!!perHasStuds[i]};
-      return _anualPeriodo(_grDRO(cId,asig,p.id),sid,inUse);
+      if(!sid)return {nota:null,parcial:false,pct:0,faltan:[],ausente:!!perHasStuds[i]};
+      return _anualPeriodo(_grDRO(cId,asig,p.id),{id:sid,nombre:e.nombre},pcfg,noPxc);
     });
     const faltan=pers.filter(function(p,i){return per[i].ausente;}).map(function(p){return p.nombre;});
     if(faltan.length)avisos.push({nombre:e.nombre,faltan:faltan});
@@ -8889,7 +8875,7 @@ function _calcAnualData(cId,asig){
   const infoPer=pers.map(function(p,i){return rows.some(function(r){return r.per[i].nota!==null;});});
   const allPeriods=pers.length>0&&infoPer.every(Boolean);
   return {co:co,pers:pers,weights:weights,studs:rows.map(function(r){return r.st;}),rows:rows,PASS:PASS,
-    inUse:inUse,infoPer:infoPer,allPeriods:allPeriods,avisos:avisos};
+    noPxc:noPxc,infoPer:infoPer,allPeriods:allPeriods,avisos:avisos};
 }
 
 function _anualMinTxt(r,allPeriods){
@@ -8911,7 +8897,7 @@ function generateAnualReport(){
   const el=document.getElementById('anual-output');
   if(!cId||!asig){toast('Selecciona curso y asignatura','e');return;}
   const D=_calcAnualData(cId,asig);
-  const {co,pers,weights,studs,rows,PASS,inUse,infoPer,allPeriods,avisos}=D;
+  const {co,pers,weights,studs,rows,PASS,noPxc,infoPer,allPeriods,avisos}=D;
   if(!studs.length){el.innerHTML='<div class="card"><div class="empty"><div class="ei">🎓</div><div class="et">Sin estudiantes</div></div></div>';return;}
   const now=new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
   const wTxt=function(w){return String(Math.round(w*10)/10);};
@@ -8920,7 +8906,7 @@ function generateAnualReport(){
   h+='<div style="font-size:16px;font-weight:800;color:var(--ink);margin-bottom:3px">📈 Progreso Anual — '+esc(asig)+'</div>';
   h+='<div style="font-size:12px;color:var(--ink2)">'+esc(co?.nombre||cId)+(co?.grado?' · '+esc(co.grado):'')+'</div>';
   h+='<div style="font-size:11px;color:var(--ink3);margin-top:2px">Generado: '+now+' · Nota mínima anual: '+PASS.toFixed(1)+
-    (inUse.length?' · Pilares de esta asignatura: '+inUse.map(function(k){return PNAMES[k];}).join(', '):'')+'</div>';
+    (noPxc?' · Sin Prueba por Competencias (PxC = promedio SABER+HACER+SER)':'')+' · Nota de cada período: la NOTA FINAL de la planilla</div>';
   h+='</div>';
 
   // Fin de año (automático) o año en curso
@@ -8931,7 +8917,7 @@ function generateAnualReport(){
       '<div style="font-weight:800;font-size:14px;color:var(--gr)">🏁 Fin de año</div>'+
       '<div style="font-size:12px;color:var(--ink2);margin-top:3px;line-height:1.5">Hay información de los '+pers.length+' períodos: la columna <strong>Definitiva del año</strong> es la nota final. '+
       nComp+' de '+rows.length+' estudiante'+(rows.length!==1?'s':'')+' con año completo'+
-      (nPar?' · '+nPar+' con algún período parcial (se cuenta proporcional a lo ya evaluado)':'')+'.</div></div>';
+      (nPar?' · '+nPar+' con algún período parcial':'')+'.</div></div>';
   } else {
     const con=pers.filter(function(p,i){return infoPer[i];}).map(function(p){return esc(p.nombre);});
     h+='<div class="card" id="anual-curso-aviso" style="margin-bottom:12px;border-left:4px solid var(--am)">'+
@@ -8964,7 +8950,7 @@ function generateAnualReport(){
     r.per.forEach(function(x){
       const nc=x.nota!==null?notaCls(x.nota):'em';
       h+='<td style="text-align:center"><span class="pn '+nc+'">'+(x.nota!==null?x.nota.toFixed(1):'—')+'</span>'+
-        (x.parcial?'<div class="anual-parcial" title="Solo se ha evaluado el '+x.pct+'% de la nota de este período; se cuenta de forma proporcional" style="font-size:9px;font-weight:700;color:var(--am)">parcial · '+x.pct+'%</div>':'')+
+        (x.parcial?'<div class="anual-parcial" title="Nota parcial, tal como la muestra la planilla: faltan pilares por evaluar ('+esc(x.faltan.join(', '))+'). Se cuenta tal cual en el acumulado." style="font-size:9px;font-weight:700;color:var(--am)">parcial · falta '+esc(x.faltan.join(', '))+'</div>':'')+
         (x.ausente?'<div style="font-size:9px;color:var(--rd)">sin registro</div>':'')+'</td>';
     });
     h+='<td style="text-align:center"><span class="pn '+(r.acum!==null?notaCls(r.acum):'em')+'" style="font-size:14px">'+(r.acum!==null?r.acum.toFixed(1):'—')+'</span>'+
@@ -8974,7 +8960,7 @@ function generateAnualReport(){
   });
   h+='</tbody></table></div>';
   h+='<div style="font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.5">'+
-    '<strong>parcial</strong>: el período aún no tiene nota en todos los pilares que usa esta asignatura; se cuenta proporcional a lo ya evaluado.'+
+    '<strong>parcial</strong>: la NOTA FINAL del período aún no tiene todos los pilares (es la misma cifra que muestra la planilla) y se cuenta tal cual en el acumulado. Si la asignatura no lleva prueba por competencias, activa <strong>Sin Prueba por Competencias</strong> arriba.'+
     (rows.some(function(r){return r.parcial&&r.minReq!==null;})?' <strong>*</strong> Mín. requerido estimado con períodos parciales.':'')+'</div>';
 
   // Cards button
@@ -9011,7 +8997,7 @@ function generateAnualCards(cId,asig){
           '<div style="height:100%;width:'+pct+'%;background:'+col+';border-radius:4px;transition:width .3s"></div>'+
         '</div>'+
         '<span style="font-size:11px;font-weight:700;color:'+col+';min-width:28px;text-align:right">'+(n!==null?n.toFixed(1):'—')+'</span>'+
-        (x.parcial?'<span title="Solo se ha evaluado el '+x.pct+'% de este período" style="font-size:9px;font-weight:700;color:var(--am)">parcial</span>':'')+
+        (x.parcial?'<span title="Nota parcial: falta '+esc(x.faltan.join(', '))+'" style="font-size:9px;font-weight:700;color:var(--am)">parcial</span>':'')+
       '</div>';
     }).join('');
     const acumCol=acum===null?'var(--ink3)':acum>=4.5?'var(--hc)':acum>=4.0?'var(--gr)':acum>=3.0?'var(--am)':'var(--rd)';
@@ -9034,11 +9020,11 @@ function exportAnualExcel(){
   const asig=document.getElementById('anual-asig')?.value||'';
   if(!cId||!asig){toast('Selecciona curso y asignatura','e');return;}
   loadXLSX(()=>{
-    const {co,pers,weights,rows:dataRows,PASS,allPeriods}=_calcAnualData(cId,asig);
+    const {co,pers,weights,rows:dataRows,PASS,allPeriods,noPxc}=_calcAnualData(cId,asig);
     const wb=XLSX.utils.book_new();
     const rows=[];
     rows.push(['PROGRESO ANUAL — '+asig]);
-    rows.push(['Curso:',co?.nombre||cId,'Generado:',new Date().toLocaleDateString('es-CO'),allPeriods?'Fin de año':'Año en curso']);
+    rows.push(['Curso:',co?.nombre||cId,'Generado:',new Date().toLocaleDateString('es-CO'),allPeriods?'Fin de año':'Año en curso',noPxc?'Sin PxC (promedio S+H+R)':'']);
     rows.push([]);
     rows.push(['#','Estudiante',...pers.map((p,i)=>p.nombre+' ('+(Math.round(weights[i]*10)/10)+'%)'),allPeriods?'Definitiva del año':'Acumulado a la fecha',allPeriods?'Estado':'Mín. requerido','Períodos parciales']);
     dataRows.forEach(function(r){
@@ -9052,6 +9038,11 @@ function exportAnualExcel(){
     xlsxDl(wb,'progreso_anual_'+asig.replace(/\s/g,'_')+'_'+(co?.nombre||cId).replace(/\s/g,'_')+'.xlsx');
     toast('Excel generado ✅','s');
   });
+}
+
+function anualToggleNoPxc(){
+  // Si ya hay un reporte en pantalla, se vuelve a generar con la opción elegida
+  if(document.getElementById('anual-output').innerHTML) generateAnualReport();
 }
 
 function infToggleNoPxc(){
