@@ -1935,7 +1935,7 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
 <!-- RECOVERY OVERLAY -->
 <div class="ov" id="recovery-ov">
   <div class="modal" style="max-width:400px">
-    <div class="mhdr"><div class="mtitle">📋 Plan de Mejoramiento</div>
+    <div class="mhdr"><div class="mtitle" id="recovery-title">📋 Plan de Mejoramiento</div>
       <button class="mx" onclick="document.getElementById('recovery-ov').classList.remove('open')">✕</button></div>
     <div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px">
       <div style="font-size:13px;color:var(--ink2);line-height:1.6" id="recovery-info"></div>
@@ -1948,6 +1948,10 @@ td.gtd-pts.gr-cell-focus .act-wm{opacity:.55;color:var(--ac);}
           <div style="font-size:11px;color:var(--ink3);margin-bottom:4px">Nota que quedará en planilla</div>
           <span id="recovery-preview-nota" class="pn" style="font-size:28px"></span>
         </div>
+      </div>
+      <div class="fg">
+        <label>¿Qué hizo el estudiante? <span style="font-weight:400;color:var(--ink3)">(opcional)</span></label>
+        <textarea id="recovery-comment" rows="3" maxlength="500" placeholder="Actividad o proceso que realizó para recuperar (ej.: presentó el taller de fracciones y lo sustentó oralmente)" style="width:100%;resize:vertical;font-size:13px;padding:8px 10px;border:1px solid var(--br);border-radius:var(--rs);font-family:inherit;box-sizing:border-box"></textarea>
       </div>
       <div style="display:flex;gap:8px">
         <button class="btn primary" onclick="saveRecovery()" style="flex:1">✓ Guardar recuperación</button>
@@ -3710,7 +3714,7 @@ function renderGrades(){
           (hasRecovery
             ? '<span class="pn em" style="font-size:10px;text-decoration:line-through;opacity:.55">'+(nota!==null?nota.toFixed(1):'—')+'</span> '+
               '<span id="'+nid+'" class="pn '+(recovNota!==null?notaCls(recovNota):'em')+'" title="Nota de recuperación">'+( recovNota!==null?recovNota.toFixed(1):'—')+'</span>'+
-              '<div style="font-size:8px;color:var(--ac);font-weight:700;letter-spacing:.03em">📋 PM</div>'
+              '<div style="font-size:8px;color:var(--ac);font-weight:700;letter-spacing:.03em;cursor:pointer" title="'+esc(s.recovery.comment?('Qué hizo: '+s.recovery.comment):'Toca para editar el plan de mejoramiento')+'" onclick="event.stopPropagation();openRecovery(\''+cId+'\',\''+esc(asig)+'\',\''+per+'\',\''+st.id+'\',\''+a.id+'\',\''+esc(a.name)+'\',\''+esc(st.nombre)+'\')">📋 PM'+(s.recovery.comment?' 💬':'')+' ✎</div>'
             : '<span id="'+nid+'" class="pn '+(nota!==null?notaCls(nota):'em')+'">'+(nota!==null?nota.toFixed(1):'—')+'</span>')+
           (nota!==null&&nota<3.0&&!hasRecovery
             ? '<button class="btn xs" style="font-size:8px;padding:1px 4px;margin-top:2px;color:var(--ac)" title="Registrar nota de plan de mejoramiento" onclick="event.stopPropagation();openRecovery(\''+cId+'\',\''+esc(asig)+'\',\''+per+'\',\''+st.id+'\',\''+a.id+'\',\''+esc(a.name)+'\',\''+esc(st.nombre)+'\')">📋 PM</button>'
@@ -7970,7 +7974,7 @@ const HELP_SECTIONS=[
         <div class="help-step"><span class="help-num">⚠️</span><div><strong>Reporte de alerta temprana</strong><br>En la pestaña <em>Alertas</em>, elija el curso, el período, la nota mínima de alerta (ej: 3.5) y el porcentaje mínimo de asistencia (ej: 75%). La app genera una lista de estudiantes en riesgo académico o de inasistencia.</div></div>
         <div class="help-step"><span class="help-num">📋</span><div><strong>Plan de mejoramiento</strong><br>En la tabla de alertas, cada estudiante con nota perdida tiene el botón <em>📋 PM</em>. Al usarlo puede registrar la nota del plan de mejoramiento y esta reemplaza la nota perdida en el cálculo definitivo.</div></div>
         <div class="help-step"><span class="help-num">📄</span><div><strong>Informe Final de Período</strong><br>Genera un reporte por curso con las notas definitivas de todos los estudiantes, listo para imprimir o compartir con coordinación.</div></div>
-        <div class="help-step"><span class="help-num">📈</span><div><strong>Progreso Anual</strong><br>Muestra cómo ha evolucionado la nota definitiva de cada estudiante período a período. También calcula qué nota necesita en los períodos que faltan para aprobar con 3.0. Solo aplica a cursos por períodos (no semestrales).</div></div>
+        <div class="help-step"><span class="help-num">📈</span><div><strong>Progreso Anual</strong><br>Muestra cómo ha evolucionado la nota definitiva de cada estudiante período a período. También calcula qué nota necesita en los períodos que faltan para aprobar con 3.0. Los períodos a los que les faltan pilares por evaluar se marcan «parcial» y se cuentan proporcional a lo ya evaluado; cuando hay información de todos los períodos, la columna pasa a «Definitiva del año». Solo aplica a cursos por períodos (no semestrales).</div></div>
         <div class="help-step"><span class="help-num">🖨️</span><div><strong>Imprimir o guardar</strong><br>Todos los reportes tienen botón de impresión. También puede exportar las planillas de notas y asistencia a hoja de cálculo desde el panel de Exportar.</div></div>
       </div>
     `
@@ -8774,6 +8778,56 @@ function anualFillSelectors(){
   }
 }
 
+// ── Progreso anual: cruce de estudiantes entre períodos por nombre ──
+// Cada período tiene su propia lista de estudiantes (con identificadores distintos), así que se cruzan por nombre:
+// sin tildes, sin mayúsculas, sin espacios dobles y sin importar el orden de las palabras.
+function _stuKey(nombre){
+  return String(nombre||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
+    .replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(Boolean).sort().join(' ');
+}
+// Lectura sin crear datos vacíos en grades
+function _grDRO(cId,asig,per){
+  const d=((grades[cId]||{})[asig]||{})[per];
+  return d||{activities:[],scores:{}};
+}
+// Pilares que esta asignatura realmente usa (tienen al menos una actividad en algún período)
+function _pillarsInUse(cId,asig,pers){
+  const used={};
+  pers.forEach(function(p){
+    const d=_grDRO(cId,asig,p.id);
+    (d.activities||[]).forEach(function(a){if(PWTS[a.pilar]!==undefined)used[a.pilar]=true;});
+  });
+  return Object.keys(PWTS).filter(function(k){return used[k];});
+}
+// ¿La actividad tiene un dato real del estudiante? (un banco sin puntos no cuenta: su 3.0 es solo el valor por defecto)
+function _actHasData(d,a,stuId){
+  if(a.partBank){const e=(d['participacion_'+_actPilar(a)]||{})[stuId];return !!(e&&e.length);}
+  if(a.tareasBank){const e=(d['tareas_'+_actPilar(a)]||{})[stuId];return !!(e&&e.length);}
+  return getActNota(d,a,stuId)!==null;
+}
+function _pillarReal(d,k,stuId){
+  return (d.activities||[]).some(function(a){return a.pilar===k&&_actHasData(d,a,stuId);});
+}
+// Nota de un estudiante en un período: promedio ponderado de los pilares que ya tienen nota real,
+// proporcional a lo evaluado (parcial = faltan pilares de los que la asignatura usa).
+function _anualPeriodo(d,stuId,inUse){
+  const pil={};let wSum=0,wTot=0;
+  inUse.forEach(function(k){
+    if(_pillarReal(d,k,stuId)){
+      const v=pillarAvgForStu(d,k,stuId);
+      if(v!==null){pil[k]=v;wSum+=v*PWTS[k];wTot+=PWTS[k];}
+    }
+  });
+  const wUse=inUse.reduce(function(s,k){return s+PWTS[k];},0);
+  if(wTot<=0)return {nota:null,parcial:false,pct:0,pil:pil,ausente:false};
+  return {
+    nota:Math.round(wSum/wTot*10)/10,
+    parcial:wTot<wUse-1e-9,
+    pct:wUse>0?Math.round(wTot/wUse*100):100,
+    pil:pil,ausente:false
+  };
+}
+
 // Helper: compute period final grade from pillars for one student
 function perFinalNota(cId, asig, perId, stuId){
   const grData=getGrD(cId,asig,perId);
@@ -8789,24 +8843,66 @@ function getPerWeights(pers){
   return pers.map(()=>100/pers.length);
 }
 
-// ── Shared anual data calculator (used by report and Excel export) ──
+// ── Shared anual data calculator (reporte, tarjetas y Excel) ──
 function _calcAnualData(cId,asig){
   const co=getC(cId);
   const pers=getPers(cId);
   const weights=getPerWeights(pers);
-  const studs=getStuDs(cId,pers[0]?.id||'');
   const PASS=3.0;
-  const rows=studs.map((st,idx)=>{
-    const perNotas=pers.map(p=>perFinalNota(cId,asig,p.id,st.id));
-    let wSum=0,wTot=0;
-    perNotas.forEach((n,i)=>{if(n!==null){wSum+=n*weights[i]/100;wTot+=weights[i]/100;}});
-    const acum=wTot>0?Math.round(wSum*10)/10:null;
-    const remWeight=pers.reduce((s,p,i)=>s+(perNotas[i]===null?weights[i]:0),0)/100;
-    let minReq=null;
-    if(remWeight>0.001){minReq=(PASS-(acum||0)*wTot)/remWeight;}
-    return {st,idx,perNotas,acum,minReq};
+  const inUse=_pillarsInUse(cId,asig,pers);
+  // Unión de los estudiantes de todos los períodos, cruzados por nombre
+  const map=new Map();
+  const perHasStuds=pers.map(function(p){return (((students[cId]||{})[p.id])||[]).length>0;});
+  pers.forEach(function(p){
+    (((students[cId]||{})[p.id])||[]).forEach(function(st){
+      const k=_stuKey(st.nombre);
+      if(!k)return;
+      if(!map.has(k))map.set(k,{nombre:st.nombre,ids:{}});
+      const e=map.get(k);
+      if(!e.ids[p.id])e.ids[p.id]=st.id;
+    });
   });
-  return {co,pers,weights,studs,rows,PASS};
+  const list=Array.from(map.values()).sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es',{sensitivity:'base'});});
+  const avisos=[];
+  const rows=list.map(function(e,idx){
+    const firstId=pers.map(function(p){return e.ids[p.id];}).find(function(x){return !!x;});
+    const st={id:firstId,nombre:e.nombre};
+    const per=pers.map(function(p,i){
+      const sid=e.ids[p.id];
+      if(!sid)return {nota:null,parcial:false,pct:0,pil:{},ausente:!!perHasStuds[i]};
+      return _anualPeriodo(_grDRO(cId,asig,p.id),sid,inUse);
+    });
+    const faltan=pers.filter(function(p,i){return per[i].ausente;}).map(function(p){return p.nombre;});
+    if(faltan.length)avisos.push({nombre:e.nombre,faltan:faltan});
+    const perNotas=per.map(function(x){return x.nota;});
+    let wSum=0,wTot=0;
+    per.forEach(function(x,i){if(x.nota!==null){wSum+=x.nota*weights[i]/100;wTot+=weights[i]/100;}});
+    const acum=wTot>0?Math.round(wSum/wTot*10)/10:null;
+    const remWeight=pers.reduce(function(s,p,i){return s+(per[i].nota===null?weights[i]:0);},0)/100;
+    let minReq=null;
+    if(remWeight>0.001){minReq=(PASS-wSum)/remWeight;}
+    const parcial=per.some(function(x){return x.parcial;});
+    const complete=per.length>0&&per.every(function(x){return x.nota!==null&&!x.parcial;});
+    return {st:st,idx:idx,per:per,perNotas:perNotas,acum:acum,minReq:minReq,parcial:parcial,complete:complete,
+      estado:complete?(acum>=PASS?'Aprobó':'No aprobó'):null};
+  });
+  const infoPer=pers.map(function(p,i){return rows.some(function(r){return r.per[i].nota!==null;});});
+  const allPeriods=pers.length>0&&infoPer.every(Boolean);
+  return {co:co,pers:pers,weights:weights,studs:rows.map(function(r){return r.st;}),rows:rows,PASS:PASS,
+    inUse:inUse,infoPer:infoPer,allPeriods:allPeriods,avisos:avisos};
+}
+
+function _anualMinTxt(r,allPeriods){
+  if(r.estado)return (r.estado==='Aprobó'?'Aprobó ✅':'No aprobó ❌');
+  if(r.minReq===null)return 'Parcial';
+  if(r.minReq<=1.0)return 'Ya aprobado 🎉';
+  if(r.minReq>5.0)return 'Difícil de recuperar ⚠️';
+  return (allPeriods?'Necesita ':'')+r.minReq.toFixed(1)+(r.parcial?'*':'');
+}
+function _anualMinCol(r){
+  if(r.estado)return r.estado==='Aprobó'?'var(--gr)':'var(--rd)';
+  if(r.minReq===null)return 'var(--ink3)';
+  return r.minReq<=3.0?'var(--gr)':r.minReq<=4.5?'var(--am)':'var(--rd)';
 }
 
 function generateAnualReport(){
@@ -8814,36 +8910,72 @@ function generateAnualReport(){
   const asig=document.getElementById('anual-asig')?.value||'';
   const el=document.getElementById('anual-output');
   if(!cId||!asig){toast('Selecciona curso y asignatura','e');return;}
-  const {co,pers,weights,studs,rows,PASS}=_calcAnualData(cId,asig);
+  const D=_calcAnualData(cId,asig);
+  const {co,pers,weights,studs,rows,PASS,inUse,infoPer,allPeriods,avisos}=D;
   if(!studs.length){el.innerHTML='<div class="card"><div class="empty"><div class="ei">🎓</div><div class="et">Sin estudiantes</div></div></div>';return;}
   const now=new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
+  const wTxt=function(w){return String(Math.round(w*10)/10);};
 
   let h='<div class="card" style="margin-bottom:12px">';
   h+='<div style="font-size:16px;font-weight:800;color:var(--ink);margin-bottom:3px">📈 Progreso Anual — '+esc(asig)+'</div>';
   h+='<div style="font-size:12px;color:var(--ink2)">'+esc(co?.nombre||cId)+(co?.grado?' · '+esc(co.grado):'')+'</div>';
-  h+='<div style="font-size:11px;color:var(--ink3);margin-top:2px">Generado: '+now+' · Nota mínima anual: '+PASS.toFixed(1)+'</div>';
+  h+='<div style="font-size:11px;color:var(--ink3);margin-top:2px">Generado: '+now+' · Nota mínima anual: '+PASS.toFixed(1)+
+    (inUse.length?' · Pilares de esta asignatura: '+inUse.map(function(k){return PNAMES[k];}).join(', '):'')+'</div>';
   h+='</div>';
+
+  // Fin de año (automático) o año en curso
+  const nComp=rows.filter(function(r){return r.complete;}).length;
+  const nPar=rows.filter(function(r){return r.parcial;}).length;
+  if(allPeriods){
+    h+='<div class="card" id="anual-fin" style="margin-bottom:12px;border-left:4px solid var(--gr)">'+
+      '<div style="font-weight:800;font-size:14px;color:var(--gr)">🏁 Fin de año</div>'+
+      '<div style="font-size:12px;color:var(--ink2);margin-top:3px;line-height:1.5">Hay información de los '+pers.length+' períodos: la columna <strong>Definitiva del año</strong> es la nota final. '+
+      nComp+' de '+rows.length+' estudiante'+(rows.length!==1?'s':'')+' con año completo'+
+      (nPar?' · '+nPar+' con algún período parcial (se cuenta proporcional a lo ya evaluado)':'')+'.</div></div>';
+  } else {
+    const con=pers.filter(function(p,i){return infoPer[i];}).map(function(p){return esc(p.nombre);});
+    h+='<div class="card" id="anual-curso-aviso" style="margin-bottom:12px;border-left:4px solid var(--am)">'+
+      '<div style="font-weight:800;font-size:14px;color:var(--am)">📅 Año en curso</div>'+
+      '<div style="font-size:12px;color:var(--ink2);margin-top:3px;line-height:1.5">Períodos con información: '+(con.length?con.join(', '):'ninguno')+' (de '+pers.length+'). '+
+      'Cuando haya información de todos, la columna pasará a <strong>Definitiva del año</strong>.</div></div>';
+  }
+  if(avisos.length){
+    h+='<div class="card" id="anual-avisos" style="margin-bottom:12px;border-left:4px solid var(--rd)">'+
+      '<div style="font-weight:700;font-size:13px;color:var(--rd)">⚠️ Estudiantes que no se encontraron en todos los períodos</div>'+
+      '<div style="font-size:12px;color:var(--ink2);margin-top:4px;line-height:1.5">Los períodos se cruzan por nombre. Si es la misma estudiante escrita distinto, corrige el nombre en <strong>Estudiantes</strong>:</div>'+
+      '<ul style="margin:6px 0 0 18px;font-size:12px;color:var(--ink2)">'+
+      avisos.slice(0,10).map(function(a){return '<li>'+esc(a.nombre)+' — sin registro en '+a.faltan.map(esc).join(', ')+'</li>';}).join('')+
+      (avisos.length>10?'<li>… y '+(avisos.length-10)+' más</li>':'')+'</ul></div>';
+  }
+
   h+='<div class="card" style="overflow-x:auto"><table class="rep-table" id="anual-table"><thead><tr>';
   h+='<th style="position:sticky;left:0;background:var(--sf2);z-index:2">#</th>';
   h+='<th style="position:sticky;left:28px;background:var(--sf2);z-index:2;min-width:140px">Estudiante</th>';
-  pers.forEach((p,i)=>{h+='<th style="text-align:center;min-width:90px">'+esc(p.nombre)+'<div style="font-size:9px;font-weight:400;color:var(--ink3)">'+weights[i]+'%</div></th>';});
-  h+='<th style="text-align:center;min-width:80px;background:var(--acl);color:var(--ac)">Acumulado</th>';
-  h+='<th style="text-align:center;min-width:100px;background:var(--aml);color:var(--am)">Mín. requerido</th>';
+  pers.forEach(function(p,i){h+='<th style="text-align:center;min-width:90px">'+esc(p.nombre)+'<div style="font-size:9px;font-weight:400;color:var(--ink3)">'+wTxt(weights[i])+'%</div></th>';});
+  h+='<th style="text-align:center;min-width:90px;background:var(--acl);color:var(--ac)">'+(allPeriods?'Definitiva del año':'Acumulado a la fecha')+'</th>';
+  h+='<th style="text-align:center;min-width:100px;background:var(--aml);color:var(--am)">'+(allPeriods?'Estado':'Mín. requerido')+'</th>';
   h+='</tr></thead><tbody>';
 
-  rows.forEach(({st,idx,perNotas,acum,minReq})=>{
-    const minReqTxt=minReq===null?'—':(minReq<=1.0?'Ya aprobado 🎉':minReq>5.0?'Difícil de recuperar ⚠️':minReq.toFixed(1));
-    const minReqCol=minReq===null?'var(--ink3)':minReq<=3.0?'var(--gr)':minReq<=4.5?'var(--am)':'var(--rd)';
+  rows.forEach(function(r){
     h+='<tr>';
-    h+='<td style="position:sticky;left:0;background:var(--sf);z-index:1;color:var(--ink3);font-size:12px">'+(idx+1)+'</td>';
+    h+='<td style="position:sticky;left:0;background:var(--sf);z-index:1;color:var(--ink3);font-size:12px">'+(r.idx+1)+'</td>';
     h+='<td style="position:sticky;left:28px;background:var(--sf);z-index:1;font-weight:600;white-space:nowrap">'+
-      '<button class="seg-ico" onclick="openFicha(\''+st.id+'\',\''+esc(st.nombre)+'\',\''+cId+'\')" title="Ficha del estudiante">📝</button> '+esc(st.nombre)+'</td>';
-    perNotas.forEach((n,i)=>{const nc=n!==null?notaCls(n):'em';h+='<td style="text-align:center"><span class="pn '+nc+'">'+(n!==null?n.toFixed(1):'—')+'</span></td>';});
-    h+='<td style="text-align:center"><span class="pn '+(acum!==null?notaCls(acum):'em')+'" style="font-size:14px">'+(acum!==null?acum.toFixed(1):'—')+'</span></td>';
-    h+='<td style="text-align:center;font-weight:700;color:'+minReqCol+'">'+esc(minReqTxt)+'</td>';
+      '<button class="seg-ico" onclick="openFicha(\''+r.st.id+'\',\''+esc(r.st.nombre)+'\',\''+cId+'\')" title="Ficha del estudiante">📝</button> '+esc(r.st.nombre)+'</td>';
+    r.per.forEach(function(x){
+      const nc=x.nota!==null?notaCls(x.nota):'em';
+      h+='<td style="text-align:center"><span class="pn '+nc+'">'+(x.nota!==null?x.nota.toFixed(1):'—')+'</span>'+
+        (x.parcial?'<div class="anual-parcial" title="Solo se ha evaluado el '+x.pct+'% de la nota de este período; se cuenta de forma proporcional" style="font-size:9px;font-weight:700;color:var(--am)">parcial · '+x.pct+'%</div>':'')+
+        (x.ausente?'<div style="font-size:9px;color:var(--rd)">sin registro</div>':'')+'</td>';
+    });
+    h+='<td style="text-align:center"><span class="pn '+(r.acum!==null?notaCls(r.acum):'em')+'" style="font-size:14px">'+(r.acum!==null?r.acum.toFixed(1):'—')+'</span>'+
+      (r.acum!==null&&!r.complete?'<div style="font-size:9px;font-weight:700;color:var(--am)">'+(r.parcial?'parcial':'a la fecha')+'</div>':'')+'</td>';
+    h+='<td style="text-align:center;font-weight:700;color:'+_anualMinCol(r)+'">'+esc(_anualMinTxt(r,allPeriods))+'</td>';
     h+='</tr>';
   });
   h+='</tbody></table></div>';
+  h+='<div style="font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.5">'+
+    '<strong>parcial</strong>: el período aún no tiene nota en todos los pilares que usa esta asignatura; se cuenta proporcional a lo ya evaluado.'+
+    (rows.some(function(r){return r.parcial&&r.minReq!==null;})?' <strong>*</strong> Mín. requerido estimado con períodos parciales.':'')+'</div>';
 
   // Cards button
   h+='<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">';
@@ -8856,34 +8988,22 @@ function generateAnualReport(){
   // Banner
   const banEl=document.getElementById('anual-banner');
   if(banEl) banEl.innerHTML=_buildBanner({
-    curso:co, asig, perName:'Año completo',
+    curso:co, asig, perName:allPeriods?'Año completo':'Año en curso',
     extraLabel:'Períodos', extraVal:pers.length,
     extraSub:studs.length+' estudiante'+(studs.length!==1?'s':'')
   });
 }
 
 function generateAnualCards(cId,asig){
-  const co=getC(cId);
-  const pers=getPers(cId);
-  const weights=getPerWeights(pers);
-  const studs=getStuDs(cId,pers[0]?.id||'');
-  const PASS=3.0;
+  const D=_calcAnualData(cId,asig);
+  const {pers,rows,PASS,allPeriods}=D;
   let h='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-top:16px">';
-  studs.forEach(st=>{
-    const perNotas=pers.map(p=>perFinalNota(cId,asig,p.id,st.id));
-    let wSum=0,wTot=0;
-    perNotas.forEach((n,i)=>{ if(n!==null){wSum+=n*weights[i]/100; wTot+=weights[i]/100;} });
-    const acum=wTot>0?Math.round(wSum*10)/10:null;
-    const remWeight=pers.reduce((s,p,i)=>s+(perNotas[i]===null?weights[i]:0),0)/100;
-    let minReq=null;
-    if(remWeight>0.001){ const needed=(PASS-(acum||0)*wTot)/remWeight; minReq=needed; }
-    const minReqTxt=minReq===null?'Completo':minReq<=1.0?'Ya aprobado 🎉':minReq>5.0?'Difícil ⚠️':minReq.toFixed(1)+' requerido';
-    const acumCol=acum===null?'var(--ink3)':acum>=4.5?'var(--hc)':acum>=4.0?'var(--gr)':acum>=3.0?'var(--am)':'var(--rd)';
-    // Mini bars
-    const barMax=5;
-    const bars=pers.map((p,i)=>{
-      const n=perNotas[i];
-      const pct=n!==null?Math.round(n/barMax*100):0;
+  rows.forEach(function(r){
+    const acum=r.acum;
+    const minReqTxt=r.estado?r.estado:(r.minReq===null?'Parcial':r.minReq<=1.0?'Ya aprobado 🎉':r.minReq>5.0?'Difícil ⚠️':r.minReq.toFixed(1)+' requerido'+(r.parcial?'*':''));
+    const bars=pers.map(function(p,i){
+      const x=r.per[i],n=x.nota;
+      const pct=n!==null?Math.round(n/5*100):0;
       const col=n===null?'var(--br)':n>=4.5?'var(--hc)':n>=4.0?'var(--gr)':n>=3.0?'var(--am)':'var(--rd)';
       return '<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">'+
         '<span style="font-size:10px;color:var(--ink3);min-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.nombre)+'</span>'+
@@ -8891,15 +9011,17 @@ function generateAnualCards(cId,asig){
           '<div style="height:100%;width:'+pct+'%;background:'+col+';border-radius:4px;transition:width .3s"></div>'+
         '</div>'+
         '<span style="font-size:11px;font-weight:700;color:'+col+';min-width:28px;text-align:right">'+(n!==null?n.toFixed(1):'—')+'</span>'+
+        (x.parcial?'<span title="Solo se ha evaluado el '+x.pct+'% de este período" style="font-size:9px;font-weight:700;color:var(--am)">parcial</span>':'')+
       '</div>';
     }).join('');
+    const acumCol=acum===null?'var(--ink3)':acum>=4.5?'var(--hc)':acum>=4.0?'var(--gr)':acum>=3.0?'var(--am)':'var(--rd)';
     h+='<div style="background:var(--sf);border:1px solid var(--br);border-radius:var(--r);padding:14px;box-shadow:var(--sh)">';
     h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
-    h+='<div style="font-size:13px;font-weight:700;flex:1">'+esc(st.nombre)+'</div>';
-    h+='<span class="pn '+(acum!==null?notaCls(acum):'em')+'" style="font-size:16px">'+(acum!==null?acum.toFixed(1):'—')+'</span>';
+    h+='<div style="font-size:13px;font-weight:700;flex:1">'+esc(r.st.nombre)+'</div>';
+    h+='<span class="pn '+(acum!==null?notaCls(acum):'em')+'" style="font-size:16px" title="'+(allPeriods?'Definitiva del año':'Acumulado a la fecha')+'">'+(acum!==null?acum.toFixed(1):'—')+'</span>';
     h+='</div>';
     h+=bars;
-    h+='<div style="margin-top:8px;font-size:11px;font-weight:600;color:var(--am)">Mín. requerido: '+esc(minReqTxt)+'</div>';
+    h+='<div style="margin-top:8px;font-size:11px;font-weight:600;color:'+(r.estado?_anualMinCol(r):'var(--am)')+'">'+(r.estado?'Año: ':'Mín. requerido: ')+esc(minReqTxt)+'</div>';
     h+='</div>';
   });
   h+='</div>';
@@ -8912,19 +9034,20 @@ function exportAnualExcel(){
   const asig=document.getElementById('anual-asig')?.value||'';
   if(!cId||!asig){toast('Selecciona curso y asignatura','e');return;}
   loadXLSX(()=>{
-    const {co,pers,weights,rows:dataRows,PASS}=_calcAnualData(cId,asig);
+    const {co,pers,weights,rows:dataRows,PASS,allPeriods}=_calcAnualData(cId,asig);
     const wb=XLSX.utils.book_new();
     const rows=[];
     rows.push(['PROGRESO ANUAL — '+asig]);
-    rows.push(['Curso:',co?.nombre||cId,'Generado:',new Date().toLocaleDateString('es-CO')]);
+    rows.push(['Curso:',co?.nombre||cId,'Generado:',new Date().toLocaleDateString('es-CO'),allPeriods?'Fin de año':'Año en curso']);
     rows.push([]);
-    rows.push(['#','Estudiante',...pers.map((p,i)=>p.nombre+' ('+weights[i]+'%)'),'Acumulado','Mín. requerido']);
-    dataRows.forEach(({st,idx,perNotas,acum,minReq})=>{
-      const minReqTxt=minReq===null?'Completo':minReq<=1.0?'Ya aprobado':minReq>5.0?'Difícil de recuperar':minReq.toFixed(1);
-      rows.push([idx+1,st.nombre,...perNotas.map(n=>n??'—'),acum??'—',minReqTxt]);
+    rows.push(['#','Estudiante',...pers.map((p,i)=>p.nombre+' ('+(Math.round(weights[i]*10)/10)+'%)'),allPeriods?'Definitiva del año':'Acumulado a la fecha',allPeriods?'Estado':'Mín. requerido','Períodos parciales']);
+    dataRows.forEach(function(r){
+      const minReqTxt=r.estado?r.estado:(r.minReq===null?'Parcial':r.minReq<=1.0?'Ya aprobado':r.minReq>5.0?'Difícil de recuperar':r.minReq.toFixed(1)+(r.parcial?' (estimado)':''));
+      const par=pers.filter(function(p,i){return r.per[i].parcial;}).map(function(p,i){return p.nombre;}).join(', ');
+      rows.push([r.idx+1,r.st.nombre,...r.perNotas.map(n=>n??'—'),r.acum??'—',minReqTxt,par]);
     });
     const ws=XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols']=[{wch:4},{wch:28},...pers.map(()=>({wch:14})),{wch:12},{wch:18}];
+    ws['!cols']=[{wch:4},{wch:28},...pers.map(()=>({wch:14})),{wch:18},{wch:18},{wch:22}];
     XLSX.utils.book_append_sheet(wb,ws,'Progreso Anual');
     xlsxDl(wb,'progreso_anual_'+asig.replace(/\s/g,'_')+'_'+(co?.nombre||cId).replace(/\s/g,'_')+'.xlsx');
     toast('Excel generado ✅','s');
@@ -10613,20 +10736,26 @@ function openRecovery(cId,asig,per,stuId,actId,actName,stuName){
   _recovery={cId,asig,per,stuId,actId,actName,stuName};
   const data=getGrD(cId,asig,per);
   const s=(data.scores[stuId]||{})[actId]||{};
+  const rec=(s.recovery&&s.recovery.obt!==undefined&&s.recovery.obt!=='')?s.recovery:null;
   const pos=s.pos||(data.activities.find(a=>a.id===actId)?.posibles)||'?';
   const nota=calcNota(s.obt??'',pos);
   document.getElementById('recovery-info').innerHTML=
     '<strong>'+esc(stuName)+'</strong><br>'+
     'Actividad: <em>'+esc(actName)+'</em><br>'+
     'Nota actual: <span class="pn fa">'+(nota!==null?nota.toFixed(1):'—')+'</span> · Puntos posibles: <strong>'+pos+'</strong><br>'+
-    '<span style="font-size:12px;color:var(--ink3)">La nota de recuperación reemplazará la nota perdida para el cálculo del promedio.</span>';
+    '<span style="font-size:12px;color:var(--ink3)">La nota de recuperación reemplazará la nota perdida para el cálculo del promedio.</span>'+
+    (rec?'<br><span style="font-size:12px;color:var(--ac);font-weight:600">Editando la recuperación registrada el '+esc(fmt(rec.fecha||today()))+'.</span>':'');
   const inp=document.getElementById('recovery-obt');
-  inp.value='';inp.max=Number(pos)||100;
+  inp.value=rec?String(rec.obt):'';inp.max=Number(pos)||100;
+  const cm=document.getElementById('recovery-comment');
+  if(cm)cm.value=rec?(rec.comment||''):'';
+  const tt=document.getElementById('recovery-title');
+  if(tt)tt.textContent=rec?'📋 Editar plan de mejoramiento':'📋 Plan de Mejoramiento';
   // Reset preview
   const prev=document.getElementById('recovery-preview');
   if(prev)prev.style.display='none';
   document.getElementById('recovery-ov').classList.add('open');
-
+  if(rec)updateRecoveryPreview();
 }
 
 function updateRecoveryPreview(){
@@ -10654,35 +10783,57 @@ function saveRecovery(){
   if(isNaN(obt)||obt<0){toast('Ingresa una nota válida','e');return;}
   const data=getGrD(cId,asig,per);
   const act=data.activities.find(a=>a.id===actId);
-  const pos=act?.posibles||obt;
+  const cur=(data.scores[stuId]||{})[actId]||{};
+  // Mismos puntos posibles que muestra la ventana y la vista previa
+  const pos=cur.pos||act?.posibles||obt;
   if(!_recovery._ok){
     const _t=_exceso(obt,pos,false);
     if(_t){_confirmExceso([actName+': '+_t],function(){_recovery._ok=true;saveRecovery();});return;}
   }
+  const comment=(document.getElementById('recovery-comment')?.value||'').trim();
+  const prevRec=(cur.recovery&&cur.recovery.obt!==undefined&&cur.recovery.obt!=='')?cur.recovery:null;
   if(!data.scores[stuId])data.scores[stuId]={};
   if(!data.scores[stuId][actId])data.scores[stuId][actId]={};
-  pushUndo('Nota de recuperación — '+actName);
-  data.scores[stuId][actId].recovery={obt,pos,fecha:today()};
-  // Create seguimiento record
+  pushUndo((prevRec?'Editar':'Registrar')+' plan de mejoramiento — '+actName);
+  const rec={obt,pos,fecha:(prevRec&&prevRec.fecha)||today()};
+  if(comment)rec.comment=comment;
+  // Registro en Seguimiento: se actualiza el mismo al editar (no se duplica)
   const nota=calcNota(obt,pos);
   const seg=getSeg(stuId);
-  seg.llamados.unshift({
-    id:uid(),fecha:today(),
-    desc:'Plan de Mejoramiento: nota '+( nota!==null?nota.toFixed(1):obt)+' en la actividad "'+actName+'". Recuperación registrada el '+fmt(today())+'.',
-    estado:'resuelto',
-    tipo:'recuperacion'
-  });
+  if(!seg.llamados)seg.llamados=[];
+  const desc='Plan de Mejoramiento: nota '+(nota!==null?nota.toFixed(1):obt)+' en la actividad "'+actName+'". Recuperación registrada el '+fmt(rec.fecha)+'.'+
+    (comment?' Qué hizo: '+comment:'')+(prevRec?' (actualizado el '+fmt(today())+')':'');
+  let ll=null;
+  if(prevRec){
+    if(prevRec.segId)ll=seg.llamados.find(function(l){return l.id===prevRec.segId;})||null;
+    if(!ll)ll=seg.llamados.find(function(l){ // registros anteriores, sin vínculo guardado
+      return l.tipo==='recuperacion'&&l.fecha===prevRec.fecha&&(l.desc||'').indexOf('"'+actName+'"')>=0;
+    })||null;
+  }
+  if(ll){ll.desc=desc;rec.segId=ll.id;}
+  else{
+    const sid=uid();
+    seg.llamados.unshift({id:sid,fecha:today(),desc:desc,estado:'resuelto',tipo:'recuperacion'});
+    rec.segId=sid;
+  }
+  data.scores[stuId][actId].recovery=rec;
   save();saveSeg();
   document.getElementById('recovery-ov').classList.remove('open');
   markGrDirty();renderGrades();
-  toast('Recuperación registrada ✅ — '+stuName,'s');
+  toast((prevRec?'Recuperación actualizada ✅ — ':'Recuperación registrada ✅ — ')+stuName,'s');
 }
 
 function removeRecovery(cId,asig,per,stuId,actId){
   if(!confirm('¿Eliminar la nota de recuperación? Se volverá a usar la nota original.'))return;
   pushUndo('Eliminar recuperación');
   const data=getGrD(cId,asig,per);
+  const rec=data.scores[stuId]?.[actId]?.recovery;
   if(data.scores[stuId]?.[actId])delete data.scores[stuId][actId].recovery;
+  // El registro de Seguimiento se conserva (historial) y queda anotado
+  if(rec&&rec.segId){
+    const ll=(getSeg(stuId).llamados||[]).find(function(l){return l.id===rec.segId;});
+    if(ll&&(ll.desc||'').indexOf('Recuperación eliminada')<0){ll.desc=(ll.desc||'')+' (Recuperación eliminada el '+fmt(today())+')';saveSeg();}
+  }
   save();markGrDirty();renderGrades();
   toast('Recuperación eliminada','s');
 }
@@ -13179,7 +13330,7 @@ function _svRenderAct(act, stuId, data){
       ' oninput="svUpdateAct(\'' + act.id + '\',this.value)">' +
       (!_svModoNota ? '<span style="font-size:11px;color:var(--ink3)">/ ' + pos + ' pts</span>' : '') +
       '<span id="sv-nota-' + act.id + '" class="pn ' + (notaE!==null?notaCls(notaE):'em') + '" style="font-size:13px;font-weight:700;margin-left:4px">' +
-      (notaE !== null ? notaE.toFixed(1) : '\u2014') + (exT ? ' \u26a0' : '') + '</span></div>';
+      (notaE !== null ? notaE.toFixed(1) : '\u2014') + (exT ? ' \u26a0' : '') + '</span></div>' + _svRecLine(act);
   }
 
   // Campo para nuevo comentario (dentro del panel colapsable)
@@ -13460,6 +13611,14 @@ function _svUpdateFinal(){
 }
 
 // Posibles reales de una actividad para este estudiante (pos propio si existe, si no el de la actividad)
+function _svRecLine(act){
+  const d=getGrD(_sv.cId,_sv.asig,_sv.per);
+  const e=((d.scores||{})[_sv.stuId]||{})[act.id];
+  const rec=e&&e.recovery;
+  if(!rec||rec.obt===undefined||rec.obt==='')return '';
+  const n=calcNota(rec.obt,rec.pos??e.pos??act.posibles);
+  return '<div style="padding:0 12px 8px;font-size:11px;color:var(--ink3)">\ud83d\udccb Plan de mejoramiento: '+(n!==null?'nota '+n.toFixed(1):'registrado')+(rec.comment?' \u2014 '+esc(rec.comment):'')+'</div>';
+}
 function _svPosEff(act){
   const b=_svBuf[act.id];
   if(b&&b.pos!==''&&b.pos!==undefined&&b.pos!==null&&!isNaN(Number(b.pos)))return Number(b.pos);
